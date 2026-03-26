@@ -204,28 +204,34 @@ def main():
     """Запуск бота"""
     print("🚀 Запуск бота W1nPAK...")
     
-    # Создаем приложение
-    application = Application.builder().token(TOKEN).build()
-    
-    # Регистрация команд
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("balance", balance))
-    application.add_handler(CommandHandler("buy", buy))
-    application.add_handler(CommandHandler("casino", casino))
-    application.add_handler(CommandHandler("duel", duel))
-    application.add_handler(CommandHandler("duel_accept", duel_accept))
-    application.add_handler(CommandHandler("leaderboard", leaderboard))
-    application.add_handler(CommandHandler("clan", clan))
-    application.add_handler(CommandHandler("give", give))
-    application.add_handler(CommandHandler("help", start))
-    
-    # Обработчики сообщений
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    application.add_handler(CallbackQueryHandler(handle_callback))
-    
-    # Запуск бота
-    print("✅ Бот успешно запущен и готов к работе!")
-    application.run_polling()
+    try:
+        # Создаем приложение
+        application = Application.builder().token(TOKEN).build()
+        
+        # Регистрация команд
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("balance", balance))
+        application.add_handler(CommandHandler("buy", buy))
+        application.add_handler(CommandHandler("casino", casino))
+        application.add_handler(CommandHandler("duel", duel))
+        application.add_handler(CommandHandler("duel_accept", duel_accept))
+        application.add_handler(CommandHandler("leaderboard", leaderboard))
+        application.add_handler(CommandHandler("clan", clan))
+        application.add_handler(CommandHandler("give", give))
+        application.add_handler(CommandHandler("help", start))
+        
+        # Обработчики сообщений
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+        application.add_handler(CallbackQueryHandler(handle_callback))
+        
+        # Запуск бота
+        print("✅ Бот успешно запущен и готов к работе!")
+        application.run_polling()
+        
+    except Exception as e:
+        print(f"❌ Ошибка при запуске бота: {e}")
+        import traceback
+        traceback.print_exc()
 
 if __name__ == '__main__':
     main()
