@@ -245,8 +245,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await query.edit_message_text("❌ Вы не состоите в клане")
 
-# Основная функция
-async def main():
+# Удалите старую функцию main() и замените на:
+def main():
+    """Запуск бота"""
+    # Создаем приложение
     application = Application.builder().token(TOKEN).build()
     
     # Регистрация команд
@@ -265,9 +267,8 @@ async def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(CallbackQueryHandler(handle_callback))
     
-    # Запуск бота
-    await application.run_polling()
+    # Запуск бота (новый способ)
+    application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == '__main__':
-    import asyncio
-    asyncio.run(main())
+    main()  # убрали asyncio.run()
