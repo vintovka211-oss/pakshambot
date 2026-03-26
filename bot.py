@@ -669,10 +669,10 @@ async def farm_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # КАЗИНО
 async def casino(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
-        [InlineKeyboardButton("🎲 Кости", callback_data="game_dice")],
-        [InlineKeyboardButton("🃏 Блэкджек", callback_data="game_blackjack")],
-        [InlineKeyboardButton("🎰 Слоты", callback_data="game_slots")],
-        [InlineKeyboardButton("💀 High Risk", callback_data="game_highrisk")],
+        [InlineKeyboardButton("🎲 Кости", callback_data="casino_dice")],
+        [InlineKeyboardButton("🃏 Блэкджек", callback_data="casino_blackjack")],
+        [InlineKeyboardButton("🎰 Слоты", callback_data="casino_slots")],
+        [InlineKeyboardButton("💀 High Risk", callback_data="casino_highrisk")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("🎮 ВЫБЕРИ ИГРУ 🎮", reply_markup=reply_markup)
