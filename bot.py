@@ -957,12 +957,77 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_bet(update, context)
         return
     
-    # Игнорируем команды
-    if update.message.text and update.message.text.startswith('/'):
+    # Получаем текст сообщения
+    text = update.message.text.strip().lower() if update.message.text else ""
+    
+    # ========== РУССКИЕ КОМАНДЫ БЕЗ СЛЕША ==========
+    # Проверка на дуэль с аргументами
+    if text.startswith("дуэль") or text.startswith("битва"):
+        parts = text.split()
+        if len(parts) >= 4:
+            opponent = parts[1]
+            try:
+                pak = int(parts[2])
+                rub = int(parts[3])
+                context.args = [opponent, str(pak), str(rub)]
+                await duel(update, context)
+            except:
+                await update.message.reply_text("❌ Ставки должны быть числами!\n\nПример: дуэль @ivan 100 50")
+        else:
+            await update.message.reply_text("⚔️ Использование дуэли:\nдуэль @username PAK РУБ\n\nПример: дуэль @ivan 100 50")
         return
     
-    # НАГРАДА ЗА СООБЩЕНИЯ УБРАНА
-    # Просто игнорируем обычные сообщения
+    # Словарь русских команд
+    russian_commands = {
+        "баланс": "balance",
+        "бал": "balance",
+        "деньги": "balance",
+        "ферма": "farm",
+        "ферму": "farm",
+        "казино": "casino",
+        "игра": "casino",
+        "клан": "clan",
+        "кланы": "clan",
+        "топ": "leaderboard",
+        "топ игроков": "leaderboard",
+        "лидеры": "leaderboard",
+        "топ кланов": "clan_leaderboard",
+        "купить": "buy",
+        "покупка": "buy",
+        "вывод": "withdraw",
+        "вывести": "withdraw",
+        "дать": "give",
+        "выдать": "give",
+    }
+    
+    # Проверяем, является ли сообщение русской командой
+    if text in russian_commands:
+        command = russian_commands[text]
+        
+        if command == "balance":
+            await balance(update, context)
+        elif command == "farm":
+            await farm(update, context)
+        elif command == "casino":
+            await casino(update, context)
+        elif command == "clan":
+            await clan(update, context)
+        elif command == "leaderboard":
+            await leaderboard(update, context)
+        elif command == "clan_leaderboard":
+            await clan_leaderboard(update, context)
+        elif command == "buy":
+            await buy(update, context)
+        elif command == "withdraw":
+            await withdraw(update, context)
+        elif command == "give":
+            if update.effective_user.id == ADMIN_ID:
+                await update.message.reply_text("❌ Использование: дать @username PAK РУБ\n\nПример: дать @ivan 100 50")
+            else:
+                await update.message.reply_text("❌ Недостаточно прав!")
+        return
+    
+    # Игнорируем обычные сообщения
     pass
 
 # ==================== ОБРАБОТЧИК CALLBACK ====================
@@ -1242,7 +1307,7 @@ async def clan_reward(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db.update_clan_reward_time(user_id)
     user_data = db.get_user(user_id)
     await update.callback_query.edit_message_text(f"💰 Вы получили 2 PAK за участие в клане!\n💎 Новый баланс: {user_data[2]} PAK")
-
+   
 # ==================== ФОНОВАЯ ЗАДАЧА ====================
 async def keep_alive():
     while True:
