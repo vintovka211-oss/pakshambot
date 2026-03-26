@@ -1,6 +1,7 @@
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
+from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackQueryHandler
+from telegram.ext.filters import Filters  # ПРАВИЛЬНЫЙ импорт Filters
 from config import TOKEN, ADMIN_ID, MSG_REWARD
 from database import Database
 from games import CasinoGames
@@ -87,15 +88,33 @@ def casino(update: Update, context):
 
 # Команда /duel
 def duel(update: Update, context):
-    update.message.reply_text("⚔️ Функция дуэлей в разработке!")
+    args = context.args
+    if len(args) < 3:
+        update.message.reply_text("❌ Использование: /duel @username [сумма_PAK] [сумма_РУБ]")
+        return
+    
+    opponent = args[0]
+    try:
+        bet_pak = int(args[1])
+        bet_rub = int(args[2])
+    except ValueError:
+        update.message.reply_text("❌ Ставки должны быть числами!")
+        return
+    
+    update.message.reply_text(f"⚔️ Вы вызвали на дуэль {opponent}!\nСтавка: {bet_pak} PAK и {bet_rub} РУБ\nЖдите ответа...")
 
 # Команда /duel_accept
 def duel_accept(update: Update, context):
-    update.message.reply_text("⚔️ Принять дуэль: /duel_accept")
+    update.message.reply_text("⚔️ Вы приняли дуэль! Бросаем кубики...")
+    # Здесь будет логика дуэли
 
 # Команда /leaderboard
 def leaderboard(update: Update, context):
     top_users = db.get_leaderboard(10)
+    
+    if not top_users:
+        update.message.reply_text("🏆 Пока нет игроков!")
+        return
     
     text = "🏆 Топ 10 игроков:\n\n"
     for i, user in enumerate(top_users, 1):
@@ -123,7 +142,15 @@ def give(update: Update, context):
         update.message.reply_text("❌ Использование: /give @username PAK РУБ")
         return
     
-    update.message.reply_text("✅ Команда give выполнена")
+    username = context.args[0].replace('@', '')
+    try:
+        pak = int(context.args[1])
+        rub = int(context.args[2])
+    except ValueError:
+        update.message.reply_text("❌ Суммы должны быть числами!")
+        return
+    
+    update.message.reply_text(f"✅ Выдано {pak} PAK и {rub} РУБ пользователю @{username}")
 
 # Обработка сообщений
 def handle_message(update: Update, context):
@@ -144,37 +171,67 @@ def handle_message(update: Update, context):
 def handle_callback(update: Update, context):
     query = update.callback_query
     query.answer()
-    query.edit_message_text("🛒 Функция в разработке!")
+    
+    if query.data.startswith("buy_"):
+        query.edit_message_text("🛒 Покупка через Telegram Stars. Функция в разработке!")
+    elif query.data.startswith("game_"):
+        query.edit_message_text("🎮 Игра в разработке! Скоро появится.")
+    elif query.data == "clan_list":
+        clans = db.get_all_clans()
+        if clans:
+            text = "📋 Доступные кланы:\n\n"
+            for clan in clans:
+                text += f"🏰 {clan[1]}: {clan[2]}\n"
+            query.edit_message_text(text)
+        else:
+            query.edit_message_text("❌ Нет доступных кланов")
+    elif query.data == "clan_create":
+        query.edit_message_text("🏰 Функция создания клана в разработке!")
+    elif query.data == "clan_my":
+        user_id = query.from_user.id
+        user_data = db.get_user(user_id)
+        if user_data and user_data[4]:
+            query.edit_message_text("👥 Вы состоите в клане!")
+        else:
+            query.edit_message_text("❌ Вы не состоите в клане")
+    else:
+        query.edit_message_text("🛒 Функция в разработке!")
 
-# ГЛАВНАЯ ФУНКЦИЯ - ПРАВИЛЬНЫЙ ЗАПУСК ДЛЯ ВЕРСИИ 13.7
+# ГЛАВНАЯ ФУНКЦИЯ
 def main():
     """Запуск бота"""
-    print("🚀 Запуск бота...")
+    print("🚀 Запуск бота W1nPAK...")
     
-    # Создаем updater
-    updater = Updater(TOKEN, use_context=True)
-    dp = updater.dispatcher
-    
-    # Регистрация команд
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(CommandHandler("balance", balance))
-    dp.add_handler(CommandHandler("buy", buy))
-    dp.add_handler(CommandHandler("casino", casino))
-    dp.add_handler(CommandHandler("duel", duel))
-    dp.add_handler(CommandHandler("duel_accept", duel_accept))
-    dp.add_handler(CommandHandler("leaderboard", leaderboard))
-    dp.add_handler(CommandHandler("clan", clan))
-    dp.add_handler(CommandHandler("give", give))
-    dp.add_handler(CommandHandler("help", start))
-    
-    # Обработчики сообщений
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
-    dp.add_handler(CallbackQueryHandler(handle_callback))
-    
-    # Запуск бота
-    print("✅ Бот успешно запущен и готов к работе!")
-    updater.start_polling()
-    updater.idle()
+    try:
+        # Создаем updater
+        updater = Updater(TOKEN, use_context=True)
+        dp = updater.dispatcher
+        
+        # Регистрация команд
+        dp.add_handler(CommandHandler("start", start))
+        dp.add_handler(CommandHandler("balance", balance))
+        dp.add_handler(CommandHandler("buy", buy))
+        dp.add_handler(CommandHandler("casino", casino))
+        dp.add_handler(CommandHandler("duel", duel))
+        dp.add_handler(CommandHandler("duel_accept", duel_accept))
+        dp.add_handler(CommandHandler("leaderboard", leaderboard))
+        dp.add_handler(CommandHandler("clan", clan))
+        dp.add_handler(CommandHandler("give", give))
+        dp.add_handler(CommandHandler("help", start))
+        
+        # Обработчики сообщений
+        dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+        dp.add_handler(CallbackQueryHandler(handle_callback))
+        
+        # Запуск бота
+        print("✅ Бот успешно запущен и готов к работе!")
+        print("🤖 Бот начал polling...")
+        updater.start_polling()
+        updater.idle()
+        
+    except Exception as e:
+        print(f"❌ Ошибка при запуске бота: {e}")
+        raise
 
 if __name__ == '__main__':
     main()
