@@ -1,10 +1,11 @@
 import asyncio
 import logging
+import random
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ContextTypes
 from config import TOKEN, ADMIN_ID, MSG_REWARD
 from database import Database
-from casino_games import CasinoGames  # Импортируем новые игры
+from casino_games import CasinoGames
 
 # Настройка логирования
 logging.basicConfig(
@@ -16,12 +17,14 @@ logger = logging.getLogger(__name__)
 # Инициализация базы данных
 db = Database()
 
+# Хранилище активных дуэлей
+active_duels = {}
+
 # Функция проверки админа
 def is_admin(user_id):
     return user_id == ADMIN_ID
 
-# Хранилище для ставок
-user_bets = {}
+# ==================== КОМАНДЫ ====================
 
 # Команда /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -39,6 +42,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 💰 /balance - Баланс
 🎲 /casino - Казино
 ⚔️ /duel - Дуэль с игроком
+⚔️ /duel_accept - Принять дуэль
+❌ /duel_cancel - Отменить дуэль
 🏆 /leaderboard - Топ игроков
 👥 /clan - Кланы
 ⭐ /buy - Купить PAK за звезды
@@ -109,7 +114,6 @@ async def handle_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Ставки должны быть числами!")
         return
     
-    # Проверяем баланс
     user_data = db.get_user(user_id)
     if user_data[2] < bet_pak or user_data[3] < bet_rub:
         await update.message.reply_text("❌ Недостаточно средств!")
@@ -121,12 +125,8 @@ async def handle_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data['waiting_for_bet'] = False
         return
     
-    # Сохраняем ставку
     game = context.user_data.get('selected_game', 'dice')
-    context.user_data['bet_pak'] = bet_pak
-    context.user_data['bet_rub'] = bet_rub
     
-    # Запускаем игру
     if game == 'dice':
         win, change_pak, change_rub, result_text = await CasinoGames.roll_dice(update, context, bet_pak, bet_rub)
     elif game == 'blackjack':
@@ -140,30 +140,35 @@ async def handle_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data['waiting_for_bet'] = False
         return
     
-    # Обновляем баланс
     if win is True:
         db.update_balance(user_id, change_pak, change_rub)
     elif win is False:
         db.update_balance(user_id, -change_pak, -change_rub)
-    else:  # Ничья
-        db.update_balance(user_id, 0, 0)
     
     await update.message.reply_text(result_text)
     
-    # Показываем новый баланс
     new_balance = db.get_user(user_id)
     await update.message.reply_text(f"💰 Новый баланс: {new_balance[2]} PAK, {new_balance[3]} РУБ")
     
     context.user_data['waiting_for_bet'] = False
 
-# Команда /duel
+# ==================== ДУЭЛИ ====================
+
+# Команда /duel - ВЫЗВАТЬ НА ДУЭЛЬ
 async def duel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
     args = context.args
+    
     if len(args) < 3:
-        await update.message.reply_text("❌ Использование: /duel @username [сумма_PAK] [сумма_РУБ]")
+        await update.message.reply_text(
+            "⚔️ ИСПОЛЬЗОВАНИЕ ДУЭЛИ:\n\n"
+            "/duel @username [PAK] [РУБ]\n\n"
+            "Пример: /duel @ivan 100 50\n\n"
+            "💰 Ставка: 100 PAK и 50 РУБ"
+        )
         return
     
-    opponent = args[0]
+    opponent_username = args[0].replace('@', '')
     try:
         bet_pak = int(args[1])
         bet_rub = int(args[2])
@@ -171,11 +176,193 @@ async def duel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Ставки должны быть числами!")
         return
     
-    await update.message.reply_text(f"⚔️ Вы вызвали на дуэль {opponent}!\nСтавка: {bet_pak} PAK и {bet_rub} РУБ\nЖдите ответа...")
+    if bet_pak <= 0 and bet_rub <= 0:
+        await update.message.reply_text("❌ Ставка должна быть больше 0!")
+        return
+    
+    challenger_data = db.get_user(user_id)
+    if not challenger_data:
+        await update.message.reply_text("❌ Сначала напишите /start")
+        return
+    
+    if challenger_data[2] < bet_pak:
+        await update.message.reply_text(f"❌ Недостаточно PAK! У вас {challenger_data[2]} PAK")
+        return
+    
+    if challenger_data[3] < bet_rub:
+        await update.message.reply_text(f"❌ Недостаточно РУБ! У вас {challenger_data[3]} РУБ")
+        return
+    
+    opponent = db.get_user_by_username(opponent_username)
+    if not opponent:
+        await update.message.reply_text(f"❌ Пользователь @{opponent_username} не найден!")
+        return
+    
+    opponent_id = opponent[0]
+    
+    if opponent_id == user_id:
+        await update.message.reply_text("❌ Нельзя вызвать самого себя на дуэль!")
+        return
+    
+    # Проверяем, нет ли уже активной дуэли
+    for opp_id, duel_info in active_duels.items():
+        if duel_info['challenger_id'] == user_id or opp_id == user_id:
+            await update.message.reply_text("❌ У вас уже есть активная дуэль!")
+            return
+    
+    duel_id = db.create_duel(user_id, opponent_id, bet_pak, bet_rub)
+    
+    active_duels[opponent_id] = {
+        'duel_id': duel_id,
+        'challenger_id': user_id,
+        'challenger_name': update.effective_user.username or str(user_id),
+        'bet_pak': bet_pak,
+        'bet_rub': bet_rub
+    }
+    
+    await update.message.reply_text(
+        f"⚔️ ВЫ ВЫЗВАЛИ НА ДУЭЛЬ @{opponent_username}!\n\n"
+        f"💰 Ставка: {bet_pak} PAK и {bet_rub} РУБ\n\n"
+        f"⏳ Ожидайте ответа..."
+    )
+    
+    try:
+        await context.bot.send_message(
+            chat_id=opponent_id,
+            text=f"⚔️ ВАС ВЫЗВАЛИ НА ДУЭЛЬ!\n\n"
+                 f"👤 Противник: @{update.effective_user.username or 'Игрок'}\n"
+                 f"💰 Ставка: {bet_pak} PAK и {bet_rub} РУБ\n\n"
+                 f"✅ Чтобы принять дуэль, напишите:\n"
+                 f"/duel_accept\n\n"
+                 f"❌ Чтобы отклонить, проигнорируйте сообщение"
+        )
+    except:
+        pass
 
-# Команда /duel_accept
+# Команда /duel_accept - ПРИНЯТЬ ДУЭЛЬ
 async def duel_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("⚔️ Вы приняли дуэль! Бросаем кубики...")
+    user_id = update.effective_user.id
+    
+    if user_id not in active_duels:
+        await update.message.reply_text("❌ У вас нет активных приглашений на дуэль!")
+        return
+    
+    duel_info = active_duels[user_id]
+    challenger_id = duel_info['challenger_id']
+    bet_pak = duel_info['bet_pak']
+    bet_rub = duel_info['bet_rub']
+    duel_id = duel_info['duel_id']
+    
+    acceptor_data = db.get_user(user_id)
+    if not acceptor_data:
+        await update.message.reply_text("❌ Сначала напишите /start")
+        del active_duels[user_id]
+        return
+    
+    if acceptor_data[2] < bet_pak:
+        await update.message.reply_text(f"❌ Недостаточно PAK для дуэли! У вас {acceptor_data[2]} PAK")
+        del active_duels[user_id]
+        return
+    
+    if acceptor_data[3] < bet_rub:
+        await update.message.reply_text(f"❌ Недостаточно РУБ для дуэли! У вас {acceptor_data[3]} РУБ")
+        del active_duels[user_id]
+        return
+    
+    # Снимаем ставки
+    db.update_balance(challenger_id, -bet_pak, -bet_rub)
+    db.update_balance(user_id, -bet_pak, -bet_rub)
+    
+    # Бросаем кубики
+    challenger_roll = random.randint(1, 6)
+    acceptor_roll = random.randint(1, 6)
+    
+    if challenger_roll > acceptor_roll:
+        winner_id = challenger_id
+        winner_name = "Вызывающий"
+        result_text = f"🎲 Вызывающий выбросил {challenger_roll}\n🎲 Противник выбросил {acceptor_roll}\n\n🏆 ПОБЕДИЛ ВЫЗЫВАЮЩИЙ!"
+        win_pak = bet_pak * 2
+        win_rub = bet_rub * 2
+        db.update_balance(winner_id, win_pak, win_rub)
+        
+    elif acceptor_roll > challenger_roll:
+        winner_id = user_id
+        winner_name = "Принявший"
+        result_text = f"🎲 Вызывающий выбросил {challenger_roll}\n🎲 Противник выбросил {acceptor_roll}\n\n🏆 ПОБЕДИЛ ПРИНЯВШИЙ!"
+        win_pak = bet_pak * 2
+        win_rub = bet_rub * 2
+        db.update_balance(winner_id, win_pak, win_rub)
+        
+    else:
+        db.update_balance(challenger_id, bet_pak, bet_rub)
+        db.update_balance(user_id, bet_pak, bet_rub)
+        
+        await update.message.reply_text(
+            f"🤝 НИЧЬЯ!\n\n"
+            f"🎲 Вызывающий выбросил {challenger_roll}\n"
+            f"🎲 Противник выбросил {acceptor_roll}\n\n"
+            f"💰 Ставки возвращены!"
+        )
+        
+        try:
+            await context.bot.send_message(
+                chat_id=challenger_id,
+                text=f"🤝 НИЧЬЯ В ДУЭЛИ!\n\n"
+                     f"🎲 Ваш бросок: {challenger_roll}\n"
+                     f"🎲 Бросок противника: {acceptor_roll}\n\n"
+                     f"💰 Ставки возвращены!"
+            )
+        except:
+            pass
+        
+        db.complete_duel(duel_id, None)
+        del active_duels[user_id]
+        return
+    
+    await update.message.reply_text(
+        f"⚔️ РЕЗУЛЬТАТ ДУЭЛИ!\n\n"
+        f"{result_text}\n\n"
+        f"💰 {winner_name} выиграл {bet_pak} PAK и {bet_rub} РУБ!\n\n"
+    )
+    
+    try:
+        await context.bot.send_message(
+            chat_id=challenger_id,
+            text=f"⚔️ РЕЗУЛЬТАТ ДУЭЛИ!\n\n"
+                 f"{result_text}\n\n"
+                 f"💰 {'Вы выиграли' if winner_id == challenger_id else 'Вы проиграли'} {bet_pak} PAK и {bet_rub} РУБ!\n\n"
+        )
+    except:
+        pass
+    
+    db.complete_duel(duel_id, winner_id)
+    del active_duels[user_id]
+
+# Команда /duel_cancel - ОТМЕНИТЬ ДУЭЛЬ
+async def duel_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    
+    cancelled = False
+    for opponent_id, duel_info in list(active_duels.items()):
+        if duel_info['challenger_id'] == user_id:
+            await update.message.reply_text(f"❌ Вы отменили дуэль")
+            
+            try:
+                await context.bot.send_message(
+                    chat_id=opponent_id,
+                    text=f"❌ Противник отменил дуэль!"
+                )
+            except:
+                pass
+            
+            del active_duels[opponent_id]
+            cancelled = True
+            break
+    
+    if not cancelled:
+        await update.message.reply_text("❌ У вас нет активных дуэлей для отмены!")
+
+# ==================== ОСТАЛЬНЫЕ КОМАНДЫ ====================
 
 # Команда /leaderboard
 async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -201,25 +388,22 @@ async def clan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("👥 Управление кланами:", reply_markup=reply_markup)
 
-# Команда /give (ИСПРАВЛЕНА - РАБОТАЕТ!)
+# Команда /give
 async def give(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
-    # Проверка админа
     if not is_admin(user_id):
-        await update.message.reply_text("❌ Недостаточно прав! Команда доступна только администратору.")
+        await update.message.reply_text("❌ Недостаточно прав!")
         return
     
-    # Если нет аргументов - выдаем себе для тестирования
     if len(context.args) == 0:
         db.update_balance(user_id, 10000, 1000)
         user_data = db.get_user(user_id)
         await update.message.reply_text(f"✅ Выдано себе: 10000 PAK и 1000 РУБ\n💰 Новый баланс: {user_data[2]} PAK, {user_data[3]} РУБ")
         return
     
-    # Если есть аргументы - выдаем другому пользователю
     if len(context.args) < 3:
-        await update.message.reply_text("❌ Использование:\n/give - выдать себе 10000 PAK и 1000 РУБ\n/give @username PAK РУБ - выдать пользователю")
+        await update.message.reply_text("❌ Использование:\n/give - выдать себе\n/give @username PAK РУБ - выдать пользователю")
         return
     
     username = context.args[0].replace('@', '')
@@ -230,28 +414,19 @@ async def give(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Суммы должны быть числами!")
         return
     
-    # Ищем пользователя в базе по username
-    conn = db.conn
-    cursor = conn.cursor()
-    cursor.execute("SELECT user_id, username FROM users WHERE username = ?", (username,))
-    result = cursor.fetchone()
-    
-    if result:
-        target_id = result[0]
-        db.update_balance(target_id, pak, rub)
-        target_data = db.get_user(target_id)
-        await update.message.reply_text(f"✅ Выдано {pak} PAK и {rub} РУБ пользователю @{username}\n💰 Новый баланс: {target_data[2]} PAK, {target_data[3]} РУБ")
+    user = db.get_user_by_username(username)
+    if user:
+        db.update_balance(user[0], pak, rub)
+        await update.message.reply_text(f"✅ Выдано {pak} PAK и {rub} РУБ пользователю @{username}")
     else:
-        await update.message.reply_text(f"❌ Пользователь @{username} не найден в базе! Убедитесь, что он написал /start боту.")
+        await update.message.reply_text(f"❌ Пользователь @{username} не найден!")
 
 # Обработка сообщений
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Проверяем, ждем ли ставку
     if context.user_data.get('waiting_for_bet'):
         await handle_bet(update, context)
         return
     
-    # Проверяем, что это не команда
     if update.message.text and update.message.text.startswith('/'):
         return
     
@@ -260,9 +435,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     db.register_user(user_id, user.username or str(user_id))
     
-    # Проверяем, можно ли получить награду
     if db.can_get_message_reward(user_id):
-        # Проверяем, установлен ли бот в описании
         if user.bio and "W1npakshambot" in user.bio:
             db.update_balance(user_id, MSG_REWARD, 0)
             db.update_message_time(user_id)
@@ -276,7 +449,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data.startswith("game_"):
         game = query.data.replace("game_", "")
         context.user_data['selected_game'] = game
-        await query.edit_message_text(f"🎮 Выбрана игра: {game}\n💰 Введите ставку в формате: PAK РУБ\nПример: 100 50")
+        await query.edit_message_text(f"🎮 Выбрана игра: {game}\n💰 Введите ставку в формате: PAK РУБ")
         context.user_data['waiting_for_bet'] = True
         
     elif query.data.startswith("buy_"):
@@ -302,16 +475,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("👥 Вы состоите в клане!")
         else:
             await query.edit_message_text("❌ Вы не состоите в клане")
-    else:
-        await query.edit_message_text("🛒 Функция в разработке!")
 
-# ГЛАВНАЯ ФУНКЦИЯ
+# ==================== ЗАПУСК ====================
+
 async def main():
-    """Запуск бота"""
     print("🚀 Запуск бота W1nPAK...")
     
     try:
-        # Создаем приложение
         application = Application.builder().token(TOKEN).build()
         
         # Регистрация команд
@@ -321,22 +491,21 @@ async def main():
         application.add_handler(CommandHandler("casino", casino))
         application.add_handler(CommandHandler("duel", duel))
         application.add_handler(CommandHandler("duel_accept", duel_accept))
+        application.add_handler(CommandHandler("duel_cancel", duel_cancel))
         application.add_handler(CommandHandler("leaderboard", leaderboard))
         application.add_handler(CommandHandler("clan", clan))
         application.add_handler(CommandHandler("give", give))
         application.add_handler(CommandHandler("help", start))
         
-        # Обработчики сообщений
+        # Обработчики
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         application.add_handler(CallbackQueryHandler(handle_callback))
         
-        # Запуск бота
         print("✅ Бот успешно запущен и готов к работе!")
         await application.initialize()
         await application.start()
         await application.updater.start_polling()
         
-        # Держим бота запущенным
         await asyncio.Event().wait()
         
     except Exception as e:
