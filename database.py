@@ -13,7 +13,7 @@ class Database:
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
                 username TEXT,
-                pak_balance INTEGER DEFAULT 0,
+                pak_balance REAL DEFAULT 0.0,
                 rub_balance INTEGER DEFAULT 0,
                 last_message_time TIMESTAMP,
                 last_clan_reward TIMESTAMP,
