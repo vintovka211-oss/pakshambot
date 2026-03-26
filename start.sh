@@ -1,2 +1,2 @@
 #!/bin/bash
-python3 paksham.py
+python3 bot.py
