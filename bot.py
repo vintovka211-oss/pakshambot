@@ -1,245 +1,13 @@
-import asyncio
-import logging
-import random
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ContextTypes
-from config import TOKEN, ADMIN_ID, MSG_REWARD
-from database import Database
-from casino_games import CasinoGames
-
-# Настройка логирования
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', 
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
-
-# Инициализация базы данных
-db = Database()
-
-# Хранилище активных дуэлей
-active_duels = {}
-
-# Функция проверки админа
-def is_admin(user_id):
-    return user_id == ADMIN_ID
-
-# ==================== КОМАНДЫ ====================
-
-# Команда /start
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    db.register_user(user.id, user.username or str(user.id))
-    
-    welcome_text = """
-🎮 Добро пожаловать в W1nPAK Бот!
-
-💰 У тебя есть:
-• PAK: 0
-• РУБ: 0
-
-Доступные команды:
-💰 /balance - Баланс
-🎲 /casino - Казино
-⚔️ /duel - Дуэль с игроком
-⚔️ /duel_accept - Принять дуэль
-❌ /duel_cancel - Отменить дуэль
-🏆 /leaderboard - Топ игроков
-👥 /clan - Кланы
-⭐ /buy - Купить PAK за звезды
-📝 /help - Помощь
-
-💡 Подсказка: Установи @W1npakshambot в описании профиля и получай 5 PAK за каждое сообщение!
-"""
-    await update.message.reply_text(welcome_text)
-
-# Команда /balance
-async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    user_data = db.get_user(user_id)
-    
-    if user_data:
-        text = f"""
-💰 Твой баланс:
-
-💎 PAK: {user_data[2]}
-💵 РУБ: {user_data[3]}
-
-⭐ 100 PAK = 10 звезд
-💰 1 рубль = 1 рубль
-"""
-        await update.message.reply_text(text)
-    else:
-        await update.message.reply_text("❌ Ошибка! Попробуй /start")
-
-# Команда /buy
-async def buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [InlineKeyboardButton("Купить 100 PAK за 10⭐", callback_data="buy_pak_100")],
-        [InlineKeyboardButton("Купить 500 PAK за 50⭐", callback_data="buy_pak_500")],
-        [InlineKeyboardButton("Купить 1 РУБ за 1⭐", callback_data="buy_rub_1")],
-        [InlineKeyboardButton("Купить 10 РУБ за 10⭐", callback_data="buy_rub_10")],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("Выбери покупку:", reply_markup=reply_markup)
-
-# Команда /casino
-async def casino(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [InlineKeyboardButton("🎲 Кости (x1.1-1.5)", callback_data="game_dice")],
-        [InlineKeyboardButton("🃏 Блэкджек (x1.1-1.4)", callback_data="game_blackjack")],
-        [InlineKeyboardButton("🎰 Слоты (x1.3-5)", callback_data="game_slots")],
-        [InlineKeyboardButton("💀 High Risk (x2-5)", callback_data="game_highrisk")],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("🎮 Выбери игру и введи ставку в формате: PAK РУБ\nПример: 100 50", reply_markup=reply_markup)
-    context.user_data['waiting_for_bet'] = True
-
-# Обработка ставки для казино
-async def handle_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.user_data.get('waiting_for_bet'):
-        return
-    
-    user_id = update.effective_user.id
-    text = update.message.text.split()
-    
-    if len(text) != 2:
-        await update.message.reply_text("❌ Неверный формат! Введите: PAK РУБ\nПример: 100 50")
-        return
-    
-    try:
-        bet_pak = int(text[0])
-        bet_rub = int(text[1])
-    except ValueError:
-        await update.message.reply_text("❌ Ставки должны быть числами!")
-        return
-    
-    user_data = db.get_user(user_id)
-    if user_data[2] < bet_pak or user_data[3] < bet_rub:
-        await update.message.reply_text("❌ Недостаточно средств!")
-        context.user_data['waiting_for_bet'] = False
-        return
-    
-    if bet_pak <= 0 or bet_rub < 0:
-        await update.message.reply_text("❌ Ставка должна быть положительной!")
-        context.user_data['waiting_for_bet'] = False
-        return
-    
-    game = context.user_data.get('selected_game', 'dice')
-    
-    if game == 'dice':
-        win, change_pak, change_rub, result_text = await CasinoGames.roll_dice(update, context, bet_pak, bet_rub)
-    elif game == 'blackjack':
-        win, change_pak, change_rub, result_text = await CasinoGames.blackjack(update, context, bet_pak, bet_rub)
-    elif game == 'slots':
-        win, change_pak, change_rub, result_text = await CasinoGames.slot_machine(update, context, bet_pak, bet_rub)
-    elif game == 'highrisk':
-        win, change_pak, change_rub, result_text = await CasinoGames.high_risk(update, context, bet_pak, bet_rub)
-    else:
-        await update.message.reply_text("❌ Игра не найдена!")
-        context.user_data['waiting_for_bet'] = False
-        return
-    
-    if win is True:
-        db.update_balance(user_id, change_pak, change_rub)
-    elif win is False:
-        db.update_balance(user_id, -change_pak, -change_rub)
-    
-    await update.message.reply_text(result_text)
-    
-    new_balance = db.get_user(user_id)
-    await update.message.reply_text(f"💰 Новый баланс: {new_balance[2]} PAK, {new_balance[3]} РУБ")
-    
-    context.user_data['waiting_for_bet'] = False
-
-# ==================== ДУЭЛИ ====================
-
-# Команда /duel - ВЫЗВАТЬ НА ДУЭЛЬ
-async def duel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    args = context.args
-    
-    if len(args) < 3:
-        await update.message.reply_text(
-            "⚔️ ИСПОЛЬЗОВАНИЕ ДУЭЛИ:\n\n"
-            "/duel @username [PAK] [РУБ]\n\n"
-            "Пример: /duel @ivan 100 50\n\n"
-            "💰 Ставка: 100 PAK и 50 РУБ"
-        )
-        return
-    
-    opponent_username = args[0].replace('@', '')
-    try:
-        bet_pak = int(args[1])
-        bet_rub = int(args[2])
-    except ValueError:
-        await update.message.reply_text("❌ Ставки должны быть числами!")
-        return
-    
-    if bet_pak <= 0 and bet_rub <= 0:
-        await update.message.reply_text("❌ Ставка должна быть больше 0!")
-        return
-    
-    challenger_data = db.get_user(user_id)
-    if not challenger_data:
-        await update.message.reply_text("❌ Сначала напишите /start")
-        return
-    
-    if challenger_data[2] < bet_pak:
-        await update.message.reply_text(f"❌ Недостаточно PAK! У вас {challenger_data[2]} PAK")
-        return
-    
-    if challenger_data[3] < bet_rub:
-        await update.message.reply_text(f"❌ Недостаточно РУБ! У вас {challenger_data[3]} РУБ")
-        return
-    
-    opponent = db.get_user_by_username(opponent_username)
-    if not opponent:
-        await update.message.reply_text(f"❌ Пользователь @{opponent_username} не найден!")
-        return
-    
-    opponent_id = opponent[0]
-    
-    if opponent_id == user_id:
-        await update.message.reply_text("❌ Нельзя вызвать самого себя на дуэль!")
-        return
-    
-    # Проверяем, нет ли уже активной дуэли
-    for opp_id, duel_info in active_duels.items():
-        if duel_info['challenger_id'] == user_id or opp_id == user_id:
-            await update.message.reply_text("❌ У вас уже есть активная дуэль!")
-            return
-    
-    duel_id = db.create_duel(user_id, opponent_id, bet_pak, bet_rub)
-    
-    active_duels[opponent_id] = {
-        'duel_id': duel_id,
-        'challenger_id': user_id,
-        'challenger_name': update.effective_user.username or str(user_id),
-        'bet_pak': bet_pak,
-        'bet_rub': bet_rub
-    }
-    
-    await update.message.reply_text(
-        f"⚔️ ВЫ ВЫЗВАЛИ НА ДУЭЛЬ @{opponent_username}!\n\n"
-        f"💰 Ставка: {bet_pak} PAK и {bet_rub} РУБ\n\n"
-        f"⏳ Ожидайте ответа..."
-    )
-    
-    try:
-        await context.bot.send_message(
             chat_id=opponent_id,
-            text=f"⚔️ ВАС ВЫЗВАЛИ НА ДУЭЛЬ!\n\n"
+            text=f"⚔️ Вас вызвали на дуэль!\n\n"
                  f"👤 Противник: @{update.effective_user.username or 'Игрок'}\n"
-                 f"💰 Ставка: {bet_pak} PAK и {bet_rub} РУБ\n\n"
-                 f"✅ Чтобы принять дуэль, напишите:\n"
-                 f"/duel_accept\n\n"
-                 f"❌ Чтобы отклонить, проигнорируйте сообщение"
+                 f"💰 Ставка: {bet_pak} PAK, {bet_rub} РУБ\n\n"
+                 f"✅ /duel_accept - принять дуэль\n"
+                 f"❌ /duel_cancel - отклонить"
         )
     except:
         pass
 
-# Команда /duel_accept - ПРИНЯТЬ ДУЭЛЬ
 async def duel_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
@@ -254,18 +22,8 @@ async def duel_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
     duel_id = duel_info['duel_id']
     
     acceptor_data = db.get_user(user_id)
-    if not acceptor_data:
-        await update.message.reply_text("❌ Сначала напишите /start")
-        del active_duels[user_id]
-        return
-    
-    if acceptor_data[2] < bet_pak:
-        await update.message.reply_text(f"❌ Недостаточно PAK для дуэли! У вас {acceptor_data[2]} PAK")
-        del active_duels[user_id]
-        return
-    
-    if acceptor_data[3] < bet_rub:
-        await update.message.reply_text(f"❌ Недостаточно РУБ для дуэли! У вас {acceptor_data[3]} РУБ")
+    if acceptor_data[2] < bet_pak or acceptor_data[3] < bet_rub:
+        await update.message.reply_text("❌ Недостаточно средств для дуэли!")
         del active_duels[user_id]
         return
     
@@ -279,58 +37,42 @@ async def duel_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if challenger_roll > acceptor_roll:
         winner_id = challenger_id
-        winner_name = "Вызывающий"
-        result_text = f"🎲 Вызывающий выбросил {challenger_roll}\n🎲 Противник выбросил {acceptor_roll}\n\n🏆 ПОБЕДИЛ ВЫЗЫВАЮЩИЙ!"
         win_pak = bet_pak * 2
         win_rub = bet_rub * 2
         db.update_balance(winner_id, win_pak, win_rub)
+        result_text = f"🎲 {challenger_roll} vs {acceptor_roll}\n🏆 ПОБЕДИЛ ВЫЗЫВАЮЩИЙ!"
         
     elif acceptor_roll > challenger_roll:
         winner_id = user_id
-        winner_name = "Принявший"
-        result_text = f"🎲 Вызывающий выбросил {challenger_roll}\n🎲 Противник выбросил {acceptor_roll}\n\n🏆 ПОБЕДИЛ ПРИНЯВШИЙ!"
         win_pak = bet_pak * 2
         win_rub = bet_rub * 2
         db.update_balance(winner_id, win_pak, win_rub)
+        result_text = f"🎲 {challenger_roll} vs {acceptor_roll}\n🏆 ПОБЕДИЛ ПРИНЯВШИЙ!"
         
     else:
         db.update_balance(challenger_id, bet_pak, bet_rub)
         db.update_balance(user_id, bet_pak, bet_rub)
-        
-        await update.message.reply_text(
-            f"🤝 НИЧЬЯ!\n\n"
-            f"🎲 Вызывающий выбросил {challenger_roll}\n"
-            f"🎲 Противник выбросил {acceptor_roll}\n\n"
-            f"💰 Ставки возвращены!"
-        )
-        
-        try:
-            await context.bot.send_message(
-                chat_id=challenger_id,
-                text=f"🤝 НИЧЬЯ В ДУЭЛИ!\n\n"
-                     f"🎲 Ваш бросок: {challenger_roll}\n"
-                     f"🎲 Бросок противника: {acceptor_roll}\n\n"
-                     f"💰 Ставки возвращены!"
-            )
-        except:
-            pass
-        
+        result_text = f"🎲 {challenger_roll} vs {acceptor_roll}\n🤝 НИЧЬЯ! Ставки возвращены."
         db.complete_duel(duel_id, None)
         del active_duels[user_id]
+        
+        await update.message.reply_text(result_text)
+        try:
+            await context.bot.send_message(chat_id=challenger_id, text=result_text)
+        except:
+            pass
         return
     
     await update.message.reply_text(
-        f"⚔️ РЕЗУЛЬТАТ ДУЭЛИ!\n\n"
-        f"{result_text}\n\n"
-        f"💰 {winner_name} выиграл {bet_pak} PAK и {bet_rub} РУБ!\n\n"
+        f"⚔️ РЕЗУЛЬТАТ ДУЭЛИ!\n\n{result_text}\n\n"
+        f"💰 Выигрыш: {bet_pak} PAK и {bet_rub} РУБ"
     )
     
     try:
         await context.bot.send_message(
             chat_id=challenger_id,
-            text=f"⚔️ РЕЗУЛЬТАТ ДУЭЛИ!\n\n"
-                 f"{result_text}\n\n"
-                 f"💰 {'Вы выиграли' if winner_id == challenger_id else 'Вы проиграли'} {bet_pak} PAK и {bet_rub} РУБ!\n\n"
+            text=f"⚔️ РЕЗУЛЬТАТ ДУЭЛИ!\n\n{result_text}\n\n"
+                 f"💰 {'Вы выиграли' if winner_id == challenger_id else 'Вы проиграли'} {bet_pak} PAK и {bet_rub} РУБ"
         )
     except:
         pass
@@ -338,33 +80,26 @@ async def duel_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db.complete_duel(duel_id, winner_id)
     del active_duels[user_id]
 
-# Команда /duel_cancel - ОТМЕНИТЬ ДУЭЛЬ
 async def duel_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
     cancelled = False
     for opponent_id, duel_info in list(active_duels.items()):
         if duel_info['challenger_id'] == user_id:
-            await update.message.reply_text(f"❌ Вы отменили дуэль")
-            
+            await update.message.reply_text("❌ Вы отменили дуэль")
             try:
-                await context.bot.send_message(
-                    chat_id=opponent_id,
-                    text=f"❌ Противник отменил дуэль!"
-                )
+                await context.bot.send_message(chat_id=opponent_id, text="❌ Противник отменил дуэль")
             except:
                 pass
-            
             del active_duels[opponent_id]
             cancelled = True
             break
     
     if not cancelled:
-        await update.message.reply_text("❌ У вас нет активных дуэлей для отмены!")
+        await update.message.reply_text("❌ У вас нет активных дуэлей!")
 
 # ==================== ОСТАЛЬНЫЕ КОМАНДЫ ====================
 
-# Команда /leaderboard
 async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     top_users = db.get_leaderboard(10)
     
@@ -372,23 +107,14 @@ async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🏆 Пока нет игроков!")
         return
     
-    text = "🏆 Топ 10 игроков:\n\n"
-    for i, user in enumerate(top_users, 1):
-        text += f"{i}. {user[0]}: 💎{user[1]} PAK | 💵{user[2]} РУБ\n"
+    text = "🏆 ТОП 10 ИГРОКОВ 🏆\n\n"
+    medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
+    
+    for i, user in enumerate(top_users):
+        text += f"{medals[i]} {user[0]}: 💎{user[1]} PAK | 💵{user[2]} РУБ\n"
     
     await update.message.reply_text(text)
 
-# Команда /clan
-async def clan(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [InlineKeyboardButton("📋 Список кланов", callback_data="clan_list")],
-        [InlineKeyboardButton("➕ Создать клан", callback_data="clan_create")],
-        [InlineKeyboardButton("👥 Мои кланы", callback_data="clan_my")],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("👥 Управление кланами:", reply_markup=reply_markup)
-
-# Команда /give
 async def give(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
@@ -399,11 +125,11 @@ async def give(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) == 0:
         db.update_balance(user_id, 10000, 1000)
         user_data = db.get_user(user_id)
-        await update.message.reply_text(f"✅ Выдано себе: 10000 PAK и 1000 РУБ\n💰 Новый баланс: {user_data[2]} PAK, {user_data[3]} РУБ")
+        await update.message.reply_text(f"✅ Выдано: 10000 PAK, 1000 РУБ\n💰 Баланс: {user_data[2]} PAK, {user_data[3]} РУБ")
         return
     
     if len(context.args) < 3:
-        await update.message.reply_text("❌ Использование:\n/give - выдать себе\n/give @username PAK РУБ - выдать пользователю")
+        await update.message.reply_text("❌ Использование: /give @username PAK РУБ")
         return
     
     username = context.args[0].replace('@', '')
@@ -421,15 +147,27 @@ async def give(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text(f"❌ Пользователь @{username} не найден!")
 
-# Обработка сообщений
+# ==================== ОБРАБОТЧИКИ СООБЩЕНИЙ ====================
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Обработка создания клана
+    if context.user_data.get('creating_clan') == 'waiting_name':
+        await clan_create_name(update, context)
+        return
+    elif context.user_data.get('creating_clan') == 'waiting_description':
+        await clan_create_description(update, context)
+        return
+    
+    # Обработка ставки в казино
     if context.user_data.get('waiting_for_bet'):
         await handle_bet(update, context)
         return
     
+    # Пропускаем команды
     if update.message.text and update.message.text.startswith('/'):
         return
     
+    # Награда за сообщения
     user_id = update.effective_user.id
     user = update.effective_user
     
@@ -441,44 +179,138 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             db.update_message_time(user_id)
             await update.message.reply_text(f"💎 +{MSG_REWARD} PAK за сообщение!")
 
-# Обработка callback запросов
+# ==================== ОБРАБОТЧИК CALLBACK ====================
+
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    data = query.data
     
-    if query.data.startswith("game_"):
-        game = query.data.replace("game_", "")
-        context.user_data['selected_game'] = game
-        await query.edit_message_text(f"🎮 Выбрана игра: {game}\n💰 Введите ставку в формате: PAK РУБ")
-        context.user_data['waiting_for_bet'] = True
+    # ========== ПОКУПКА ЗА ЗВЕЗДЫ ==========
+    if data.startswith("buy_stars_"):
+        stars = int(data.replace("buy_stars_", ""))
+        if stars == 10:
+            await handle_star_purchase(update, context, 10, 100, 0)
+        elif stars == 50:
+            await handle_star_purchase(update, context, 50, 500, 0)
+        elif stars == 100:
+            await handle_star_purchase(update, context, 100, 1200, 0)
+        elif stars == 500:
+            await handle_star_purchase(update, context, 500, 6500, 0)
+    
+    elif data.startswith("buy_rub_"):
+        stars = int(data.replace("buy_rub_", ""))
+        if stars == 1:
+            await handle_star_purchase(update, context, 1, 0, 1)
+        elif stars == 10:
+            await handle_star_purchase(update, context, 10, 0, 10)
+        elif stars == 50:
+            await handle_star_purchase(update, context, 50, 0, 55)
+        elif stars == 100:
+            await handle_star_purchase(update, context, 100, 0, 115)
+    
+    elif data.startswith("confirm_stars_"):
+        parts = data.split("_")
+        stars = int(parts[2])
+        pak = int(parts[3])
+        rub = int(parts[4])
         
-    elif query.data.startswith("buy_"):
-        await query.edit_message_text("🛒 Покупка через Telegram Stars. Функция в разработке!")
-        
-    elif query.data == "clan_list":
-        clans = db.get_all_clans()
-        if clans:
-            text = "📋 Доступные кланы:\n\n"
-            for clan in clans:
-                text += f"🏰 {clan[1]}: {clan[2]}\n"
-            await query.edit_message_text(text)
-        else:
-            await query.edit_message_text("❌ Нет доступных кланов")
-            
-    elif query.data == "clan_create":
-        await query.edit_message_text("🏰 Функция создания клана в разработке!")
-        
-    elif query.data == "clan_my":
         user_id = query.from_user.id
-        user_data = db.get_user(user_id)
-        if user_data and user_data[4]:
-            await query.edit_message_text("👥 Вы состоите в клане!")
-        else:
-            await query.edit_message_text("❌ Вы не состоите в клане")
+        db.update_balance(user_id, pak, rub)
+        db.add_star_purchase(user_id, stars, pak, rub)
+        
+        await query.edit_message_text(
+            f"✅ Покупка успешно завершена!\n\n"
+            f"⭐ Потрачено звезд: {stars}\n"
+            f"💰 Получено: +{pak} PAK, +{rub} РУБ"
+        )
+    
+    elif data == "cancel_purchase":
+        await query.edit_message_text("❌ Покупка отменена")
+    
+    # ========== КЛАНЫ ==========
+    elif data == "clan_list":
+        await clan_list(update, context)
+    elif data == "clan_create":
+        await clan_create_start(update, context)
+    elif data == "clan_my":
+        await clan_my(update, context)
+    elif data == "clan_leave":
+        await clan_leave(update, context)
+    elif data == "clan_reward":
+        await clan_reward(update, context)
+    elif data == "clan_back":
+        await clan(update, context)
+    
+    elif data.startswith("clan_join_"):
+        clan_id = int(data.replace("clan_join_", ""))
+        await clan_join(update, context, clan_id)
+    
+    elif data.startswith("clan_requests_"):
+        clan_id = int(data.replace("clan_requests_", ""))
+        await clan_requests(update, context, clan_id)
+    
+    elif data.startswith("clan_accept_"):
+        parts = data.split("_")
+        request_id = int(parts[2])
+        clan_id = int(parts[3])
+        await clan_accept(update, context, request_id, clan_id)
+    
+    elif data.startswith("clan_reject_"):
+        request_id = int(data.replace("clan_reject_", ""))
+        await clan_reject(update, context, request_id)
+    
+    elif data.startswith("clan_kick_"):
+        clan_id = int(data.replace("clan_kick_", ""))
+        await clan_kick(update, context, clan_id)
+    
+    elif data.startswith("clan_kick_user_"):
+        parts = data.split("_")
+        clan_id = int(parts[3])
+        user_id = int(parts[4])
+        await clan_kick_user(update, context, clan_id, user_id)
+    
+    # ========== ИГРЫ ==========
+    elif data.startswith("game_"):
+        game = data.replace("game_", "")
+        context.user_data['selected_game'] = game
+        await query.edit_message_text(
+            f"🎮 Выбрана игра: {game}\n\n"
+            f"💰 Введите ставку в формате:\n"
+            f"PAK РУБ\n\n"
+            f"Пример: 100 50"
+        )
+        context.user_data['waiting_for_bet'] = True
 
-# ==================== ЗАПУСК ====================
+# ==================== ЗАПУСК БОТА ====================
 
 async def main():
+    """Запуск бота с защитой от дублирования"""
+    
+    # Проверяем, не запущен ли уже бот
+    pid_file = "bot.pid"
+    if os.path.exists(pid_file):
+        try:
+            with open(pid_file, 'r') as f:
+                old_pid = f.read().strip()
+            if old_pid:
+                try:
+                    os.kill(int(old_pid), 0)
+                    print(f"❌ Бот уже запущен с PID: {old_pid}")
+                    sys.exit(1)
+                except (ProcessLookupError, ValueError):
+                    print("✅ Старый PID неактивен, запускаем...")
+        except Exception as e:
+            print(f"⚠️ Ошибка проверки PID: {e}")
+    
+    # Сохраняем текущий PID
+    try:
+        with open(pid_file, 'w') as f:
+            f.write(str(os.getpid()))
+        print(f"📝 Сохранен PID: {os.getpid()}")
+    except Exception as e:
+        print(f"⚠️ Не удалось сохранить PID: {e}")
+    
     print("🚀 Запуск бота W1nPAK...")
     
     try:
@@ -497,21 +329,39 @@ async def main():
         application.add_handler(CommandHandler("give", give))
         application.add_handler(CommandHandler("help", start))
         
-        # Обработчики
+        # Обработчики сообщений
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         application.add_handler(CallbackQueryHandler(handle_callback))
         
         print("✅ Бот успешно запущен и готов к работе!")
+        
+        # Запуск бота
         await application.initialize()
         await application.start()
         await application.updater.start_polling()
         
+        print("🤖 Бот начал polling...")
+        
+        # Держим бота запущенным
         await asyncio.Event().wait()
         
     except Exception as e:
         print(f"❌ Ошибка при запуске бота: {e}")
         import traceback
         traceback.print_exc()
+    finally:
+        # Удаляем PID файл при завершении
+        try:
+            if os.path.exists(pid_file):
+                os.remove(pid_file)
+                print("🧹 PID файл удален")
+        except:
+            pass
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("🛑 Бот остановлен пользователем")
+    except Exception as e:
+        print(f"❌ Критическая ошибка: {e}")
