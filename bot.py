@@ -908,10 +908,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     db.register_user(user_id, user.username or str(user_id))
     if db.can_get_message_reward(user_id):
-        if user.bio and "W1npakshambot" in user.bio:
-            db.update_balance(user_id, MSG_REWARD, 0)
-            db.update_message_time(user_id)
-            await update.message.reply_text(f"💎 +{MSG_REWARD} PAK за сообщение!")
+        if db.can_get_message_reward(user_id):
+    if user.bio and "W1npakshambot" in user.bio:
+        db.update_balance(user_id, MSG_REWARD, 0)
+        db.update_message_time(user_id)
+        # Показываем с двумя знаками после запятой
+        await update.message.reply_text(f"💎 +{MSG_REWARD:.2f} PAK за сообщение!")
 
 # ОБРАБОТЧИК CALLBACK
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
