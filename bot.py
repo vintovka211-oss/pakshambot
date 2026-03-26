@@ -846,6 +846,29 @@ async def clan_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
         name, members, total_pak, total_rub, total_wealth = clan
         text += f"{medals[i]} {name}\n   👥 {members} участников\n   💎 {total_pak} PAK | 💵 {total_rub} РУБ\n   💰 Общая ценность: {total_wealth:.0f} PAK\n   ➖➖➖➖➖➖➖\n"
     await update.message.reply_text(text)
+    
+    # ==================== ВЫВОД СРЕДСТВ ====================
+async def withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Вывод средств (заглушка)"""
+    user_id = update.effective_user.id
+    user_data = db.get_user(user_id)
+    
+    keyboard = [
+        [InlineKeyboardButton("🔔 Уведомить о запуске", callback_data="withdraw_notify")],
+        [InlineKeyboardButton("🔙 Назад", callback_data="withdraw_back")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        "💸 ВЫВОД СРЕДСТВ 💸\n\n"
+        "⚙️ Функция вывода средств находится в разработке!\n\n"
+        "Скоро вы сможете выводить средства на:\n"
+        "• Telegram Stars\n"
+        "• Криптовалюту (USDT, TON)\n"
+        "• Банковские карты\n\n"
+        "Следите за обновлениями! 🔜",
+        reply_markup=reply_markup
+    )
 
 # ==================== ПОКУПКА ЗА ЗВЕЗДЫ ====================
 async def buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
