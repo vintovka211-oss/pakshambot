@@ -199,13 +199,13 @@ def handle_callback(update: Update, context):
     else:
         query.edit_message_text("🛒 Функция в разработке!")
 
-# ГЛАВНАЯ ФУНКЦИЯ
+# ГЛАВНАЯ ФУНКЦИЯ - УПРОЩЕННЫЙ ВАРИАНТ
 def main():
     """Запуск бота"""
     print("🚀 Запуск бота W1nPAK...")
     
     try:
-        # Создаем updater (убрали use_context)
+        # Создаем updater (простой способ)
         updater = Updater(TOKEN)
         dp = updater.dispatcher
         
@@ -233,7 +233,8 @@ def main():
         
     except Exception as e:
         print(f"❌ Ошибка при запуске бота: {e}")
-        raise
+        import traceback
+        traceback.print_exc()
 
 if __name__ == '__main__':
     main()
