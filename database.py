@@ -1,6 +1,5 @@
 import sqlite3
 from datetime import datetime, timedelta
-import json
 
 class Database:
     def __init__(self):
@@ -17,9 +16,9 @@ class Database:
                 pak_balance INTEGER DEFAULT 0,
                 rub_balance INTEGER DEFAULT 0,
                 last_message_time TIMESTAMP,
+                last_clan_reward TIMESTAMP,
                 in_clan INTEGER DEFAULT NULL,
-                clan_role TEXT DEFAULT NULL,
-                FOREIGN KEY (in_clan) REFERENCES clans(clan_id)
+                clan_role TEXT DEFAULT NULL
             )
         ''')
         
@@ -30,6 +29,18 @@ class Database:
                 name TEXT UNIQUE,
                 description TEXT,
                 owner_id INTEGER,
+                created_at TIMESTAMP,
+                member_count INTEGER DEFAULT 1
+            )
+        ''')
+        
+        # Таблица заявок в кланы
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS clan_requests (
+                request_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                clan_id INTEGER,
+                user_id INTEGER,
+                status TEXT DEFAULT 'pending',
                 created_at TIMESTAMP
             )
         ''')
@@ -43,6 +54,19 @@ class Database:
                 bet_pak INTEGER,
                 bet_rub INTEGER,
                 status TEXT,
+                winner_id INTEGER DEFAULT NULL,
+                created_at TIMESTAMP
+            )
+        ''')
+        
+        # Таблица покупок за звезды
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS star_purchases (
+                purchase_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                stars INTEGER,
+                pak_gained INTEGER,
+                rub_gained INTEGER,
                 created_at TIMESTAMP
             )
         ''')
@@ -51,9 +75,9 @@ class Database:
     
     def register_user(self, user_id, username):
         self.cursor.execute('''
-            INSERT OR IGNORE INTO users (user_id, username, last_message_time)
-            VALUES (?, ?, ?)
-        ''', (user_id, username, datetime.now()))
+            INSERT OR IGNORE INTO users (user_id, username, last_message_time, last_clan_reward)
+            VALUES (?, ?, ?, ?)
+        ''', (user_id, username, datetime.now(), datetime.now()))
         self.conn.commit()
     
     def get_user(self, user_id):
@@ -87,12 +111,14 @@ class Database:
         ''', (datetime.now(), user_id))
         self.conn.commit()
     
+    # ============ МЕТОДЫ ДЛЯ КЛАНОВ ============
+    
     def create_clan(self, name, description, owner_id):
         try:
             self.cursor.execute('''
-                INSERT INTO clans (name, description, owner_id, created_at)
-                VALUES (?, ?, ?, ?)
-            ''', (name, description, owner_id, datetime.now()))
+                INSERT INTO clans (name, description, owner_id, created_at, member_count)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (name, description, owner_id, datetime.now(), 1))
             clan_id = self.cursor.lastrowid
             
             self.cursor.execute('''
@@ -105,8 +131,16 @@ class Database:
             return None
     
     def get_all_clans(self):
-        self.cursor.execute('SELECT clan_id, name, description FROM clans')
+        self.cursor.execute('SELECT clan_id, name, description, member_count FROM clans ORDER BY member_count DESC')
         return self.cursor.fetchall()
+    
+    def get_clan_by_id(self, clan_id):
+        self.cursor.execute('SELECT * FROM clans WHERE clan_id = ?', (clan_id,))
+        return self.cursor.fetchone()
+    
+    def get_clan_by_name(self, name):
+        self.cursor.execute('SELECT * FROM clans WHERE name = ?', (name,))
+        return self.cursor.fetchone()
     
     def get_clan_members(self, clan_id):
         self.cursor.execute('''
@@ -115,73 +149,74 @@ class Database:
         ''', (clan_id,))
         return self.cursor.fetchall()
     
-    def add_to_clan(self, user_id, clan_id):
+    def get_clan_owner(self, clan_id):
+        self.cursor.execute('SELECT owner_id FROM clans WHERE clan_id = ?', (clan_id,))
+        result = self.cursor.fetchone()
+        return result[0] if result else None
+    
+    def send_clan_request(self, clan_id, user_id):
+        # Проверяем, нет ли уже заявки
+        self.cursor.execute('''
+            SELECT * FROM clan_requests WHERE clan_id = ? AND user_id = ? AND status = 'pending'
+        ''', (clan_id, user_id))
+        if self.cursor.fetchone():
+            return False
+        
+        self.cursor.execute('''
+            INSERT INTO clan_requests (clan_id, user_id, created_at)
+            VALUES (?, ?, ?)
+        ''', (clan_id, user_id, datetime.now()))
+        self.conn.commit()
+        return True
+    
+    def get_clan_requests(self, clan_id):
+        self.cursor.execute('''
+            SELECT r.request_id, r.user_id, u.username, r.created_at
+            FROM clan_requests r
+            JOIN users u ON r.user_id = u.user_id
+            WHERE r.clan_id = ? AND r.status = 'pending'
+        ''', (clan_id,))
+        return self.cursor.fetchall()
+    
+    def accept_clan_request(self, request_id, clan_id):
+        self.cursor.execute('SELECT user_id FROM clan_requests WHERE request_id = ?', (request_id,))
+        result = self.cursor.fetchone()
+        if not result:
+            return False
+        
+        user_id = result[0]
+        
+        # Обновляем статус заявки
+        self.cursor.execute('''
+            UPDATE clan_requests SET status = 'accepted' WHERE request_id = ?
+        ''', (request_id,))
+        
+        # Добавляем пользователя в клан
         self.cursor.execute('''
             UPDATE users SET in_clan = ?, clan_role = 'member'
             WHERE user_id = ?
         ''', (clan_id, user_id))
+        
+        # Увеличиваем счетчик участников
+        self.cursor.execute('''
+            UPDATE clans SET member_count = member_count + 1 WHERE clan_id = ?
+        ''', (clan_id,))
+        
+        self.conn.commit()
+        return user_id
+    
+    def reject_clan_request(self, request_id):
+        self.cursor.execute('''
+            UPDATE clan_requests SET status = 'rejected' WHERE request_id = ?
+        ''', (request_id,))
         self.conn.commit()
     
     def remove_from_clan(self, user_id):
-        self.cursor.execute('''
-            UPDATE users SET in_clan = NULL, clan_role = NULL
-            WHERE user_id = ?
-        ''', (user_id,))
-        self.conn.commit()
-    
-    def get_leaderboard(self, limit=10):
-        self.cursor.execute('''
-            SELECT username, pak_balance, rub_balance 
-            FROM users 
-            ORDER BY pak_balance DESC, rub_balance DESC 
-            LIMIT ?
-        ''', (limit,))
-        return self.cursor.fetchall()
-    
-    def create_duel(self, challenger_id, opponent_id, bet_pak, bet_rub):
-        self.cursor.execute('''
-            INSERT INTO duels (challenger_id, opponent_id, bet_pak, bet_rub, status, created_at)
-            VALUES (?, ?, ?, ?, 'pending', ?)
-        ''', (challenger_id, opponent_id, bet_pak, bet_rub, datetime.now()))
-        self.conn.commit()
-        return self.cursor.lastrowid
-    
-    def get_pending_duel(self, user_id):
-        self.cursor.execute('''
-            SELECT * FROM duels 
-            WHERE (opponent_id = ? OR challenger_id = ?) AND status = 'pending'
-        ''', (user_id, user_id))
-        return self.cursor.fetchone()
-    
-    def accept_duel(self, duel_id):
-        self.cursor.execute('''
-            UPDATE duels SET status = 'accepted' WHERE duel_id = ?
-        ''', (duel_id,))
-        self.conn.commit()
-    
-    def complete_duel(self, duel_id, winner_id):
-        self.cursor.execute('''
-            UPDATE duels SET status = 'completed' WHERE duel_id = ?
-        ''', (duel_id,))
-        self.conn.commit()
-        
-        # Получаем информацию о дуэли
-        self.cursor.execute('SELECT * FROM duels WHERE duel_id = ?', (duel_id,))
-        duel = self.cursor.fetchone()
-        
-        if winner_id == duel[1]:  # challenger выиграл
-            self.update_balance(winner_id, duel[3], duel[4])
-            loser_id = duel[2]
-        else:
-            self.update_balance(winner_id, duel[3], duel[4])
-            loser_id = duel[1]
-        
-        self.update_balance(loser_id, -duel[3], -duel[4])
-        return duel
-    
-    def get_clan_members_for_reward(self):
-        # Получаем участников кланов для начисления награды
-        self.cursor.execute('''
-            SELECT user_id FROM users WHERE in_clan IS NOT NULL
-        ''')
-        return self.cursor.fetchall()
+        # Получаем текущий клан пользователя
+        self.cursor.execute('SELECT in_clan FROM users WHERE user_id = ?', (user_id,))
+        result = self.cursor.fetchone()
+        if result and result[0]:
+            clan_id = result[0]
+            # Уменьшаем счетчик участников
+            self.cursor.execute('''
+                UPDATE clans SET member
