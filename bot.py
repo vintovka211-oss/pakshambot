@@ -557,7 +557,7 @@ async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
         stars_value = total_rub_value / 2
         text = f"""💰 ТВОЙ БАЛАНС:
 
-💎 PAK: {user_data[2]}
+💎 PAK: {user_data[2]:.2f}
 💵 РУБ: {user_data[3]}
 
 📊 ЭКВИВАЛЕНТ:
