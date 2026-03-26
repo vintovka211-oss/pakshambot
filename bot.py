@@ -150,7 +150,7 @@ def give(update: Update, context):
     
     update.message.reply_text(f"✅ Выдано {pak} PAK и {rub} РУБ пользователю @{username}")
 
-# Обработка сообщений (без Filters)
+# Обработка сообщений
 def handle_message(update: Update, context):
     # Проверяем, что это не команда
     if update.message.text and update.message.text.startswith('/'):
@@ -205,8 +205,8 @@ def main():
     print("🚀 Запуск бота W1nPAK...")
     
     try:
-        # Создаем updater
-        updater = Updater(TOKEN, use_context=True)
+        # Создаем updater (убрали use_context)
+        updater = Updater(TOKEN)
         dp = updater.dispatcher
         
         # Регистрация команд
@@ -221,7 +221,7 @@ def main():
         dp.add_handler(CommandHandler("give", give))
         dp.add_handler(CommandHandler("help", start))
         
-        # Обработчик сообщений (без Filters)
+        # Обработчик сообщений
         dp.add_handler(MessageHandler(None, handle_message))
         dp.add_handler(CallbackQueryHandler(handle_callback))
         
