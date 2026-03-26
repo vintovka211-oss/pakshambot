@@ -965,12 +965,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Просто игнорируем обычные сообщения
     pass
 
-# ОБРАБОТЧИК CALLBACK
+# ==================== ОБРАБОТЧИК CALLBACK ====================
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
     
+    # ========== ФЕРМА ==========
     if data == "farm_collect":
         await farm_collect(update, context)
     elif data == "farm_upgrade":
@@ -979,6 +980,42 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await farm_stats(update, context)
     elif data == "farm_leaderboard":
         await farm_leaderboard(update, context)
+    
+    # ========== КАЗИНО (с префиксом casino_) ==========
+    elif data == "casino_dice":
+        context.user_data['selected_game'] = 'dice'
+        await query.edit_message_text(
+            "🎲 Выбрана игра: КОСТИ\n\n"
+            "💰 Введите ставку в формате: PAK РУБ\n\n"
+            "Пример: 100 50"
+        )
+        context.user_data['waiting_for_bet'] = True
+    elif data == "casino_blackjack":
+        context.user_data['selected_game'] = 'blackjack'
+        await query.edit_message_text(
+            "🃏 Выбрана игра: БЛЭКДЖЕК\n\n"
+            "💰 Введите ставку в формате: PAK РУБ\n\n"
+            "Пример: 100 50"
+        )
+        context.user_data['waiting_for_bet'] = True
+    elif data == "casino_slots":
+        context.user_data['selected_game'] = 'slots'
+        await query.edit_message_text(
+            "🎰 Выбрана игра: СЛОТЫ\n\n"
+            "💰 Введите ставку в формате: PAK РУБ\n\n"
+            "Пример: 100 50"
+        )
+        context.user_data['waiting_for_bet'] = True
+    elif data == "casino_highrisk":
+        context.user_data['selected_game'] = 'highrisk'
+        await query.edit_message_text(
+            "💀 Выбрана игра: HIGH RISK\n\n"
+            "💰 Введите ставку в формате: PAK РУБ\n\n"
+            "Пример: 100 50"
+        )
+        context.user_data['waiting_for_bet'] = True
+    
+    # ========== КЛАНЫ ==========
     elif data == "clan_list":
         await clan_list(update, context)
     elif data == "clan_create":
@@ -1013,11 +1050,43 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         clan_id = int(parts[3])
         user_id = int(parts[4])
         await clan_kick_user(update, context, clan_id, user_id)
-    elif data.startswith("game_"):
-        game = data.replace("game_", "")
-        context.user_data['selected_game'] = game
-        await query.edit_message_text(f"🎮 Выбрана игра: {game}\n\n💰 Введите ставку в формате: PAK РУБ\n\nПример: 100 50")
-        context.user_data['waiting_for_bet'] = True
+    
+    # ========== ПОКУПКА ЗА ЗВЕЗДЫ ==========
+    elif data.startswith("buy_pak_"):
+        stars = int(data.replace("buy_pak_", ""))
+        if stars == 1:
+            await process_star_purchase(update, context, 1, 4, 0)
+        elif stars == 5:
+            await process_star_purchase(update, context, 5, 20, 0)
+        elif stars == 10:
+            await process_star_purchase(update, context, 10, 45, 0)
+        elif stars == 50:
+            await process_star_purchase(update, context, 50, 250, 0)
+    
+    elif data.startswith("buy_rub_"):
+        stars = int(data.replace("buy_rub_", ""))
+        if stars == 1:
+            await process_star_purchase(update, context, 1, 0, 1)
+        elif stars == 5:
+            await process_star_purchase(update, context, 5, 0, 5)
+        elif stars == 10:
+            await process_star_purchase(update, context, 10, 0, 11)
+        elif stars == 50:
+            await process_star_purchase(update, context, 50, 0, 60)
+    
+    elif data.startswith("confirm_stars_"):
+        parts = data.split("_")
+        stars = int(parts[2])
+        pak = int(parts[3])
+        rub = int(parts[4])
+        await confirm_star_purchase(update, context, stars, pak, rub)
+    
+    elif data == "cancel_purchase":
+        await query.edit_message_text("❌ Покупка отменена")
+    
+    # ========== ВЫВОД СРЕДСТВ ==========
+    elif data == "withdraw_notify":
+        await query.edit_message_text("🔔 Вы будете уведомлены, когда вывод средств станет доступен!")
 
 # ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ КЛАНОВ ====================
 async def clan_create_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
