@@ -597,8 +597,8 @@ async def farm_collect(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_data = db.get_user(user_id)
         await update.callback_query.edit_message_text(
             f"🌾 ВЫ СОБРАЛИ УРОЖАЙ!\n\n"
-            f"💰 Получено: +{earned} PAK\n"
-            f"💎 Текущий баланс: {user_data[2]} PAK\n"
+            f"💰 Получено: +{earned:.2f} PAK\n"
+f"💎 Текущий баланс: {user_data[2]:.2f} PAK\n"
             f"⚡ Добыча/час: {user_data[7]} PAK"
         )
     else:
