@@ -9,6 +9,10 @@ from aiohttp import web
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ContextTypes
 
+# Курсы обмена звезд (НОВЫЕ)
+STARS_TO_PAK = 4   # 1 звезда = 4 PAK
+STARS_TO_RUB = 1   # 1 звезда = 1 РУБ
+
 # ==================== КОНФИГУРАЦИЯ ====================
 TOKEN = "8593186262:AAGN6sTyBa1RlJ0eVWwNVzgYUb6aVy_H9LA"
 ADMIN_ID = 8493522297
