@@ -1215,8 +1215,15 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("❌ Покупка отменена")
     
     # ========== ВЫВОД СРЕДСТВ ==========
-    elif data == "withdraw_notify":
-        await query.edit_message_text("🔔 Вы будете уведомлены, когда вывод средств станет доступен!")
+elif data == "withdraw_notify":
+    await query.edit_message_text(
+        "🔔 Вы будете уведомлены, когда вывод средств станет доступен!\n\n"
+        "Спасибо за интерес к нашему боту! 🚀"
+    )
+elif data == "withdraw_back":
+    await query.edit_message_text("🔙 Возврат в главное меню")
+    # Показываем главное меню
+    await start(update, context)
 
 # ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ КЛАНОВ ====================
 async def clan_create_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
