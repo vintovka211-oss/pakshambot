@@ -925,6 +925,29 @@ async def confirm_star_purchase(update: Update, context: ContextTypes.DEFAULT_TY
         f"💰 Получено: +{pak} PAK, +{rub} РУБ\n\n"
         f"💎 Новый баланс: {user_data[2]:.2f} PAK, {user_data[3]} РУБ"
     )
+    
+    # ==================== ВЫВОД СРЕДСТВ ====================
+async def withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Вывод средств (заглушка)"""
+    user_id = update.effective_user.id
+    user_data = db.get_user(user_id)
+    
+    keyboard = [
+        [InlineKeyboardButton("🔔 Уведомить о запуске", callback_data="withdraw_notify")],
+        [InlineKeyboardButton("🔙 Назад", callback_data="withdraw_back")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        "💸 ВЫВОД СРЕДСТВ 💸\n\n"
+        "⚙️ Функция вывода средств находится в разработке!\n\n"
+        "Скоро вы сможете выводить средства на:\n"
+        "• Telegram Stars\n"
+        "• Криптовалюту (USDT, TON)\n"
+        "• Банковские карты\n\n"
+        "Следите за обновлениями! 🔜",
+        reply_markup=reply_markup
+    )
 
 # ТОП ИГРОКОВ
 async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
