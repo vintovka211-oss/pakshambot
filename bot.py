@@ -1,6 +1,6 @@
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackQueryHandler
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ContextTypes
 from config import TOKEN, ADMIN_ID, MSG_REWARD
 from database import Database
 from games import CasinoGames
@@ -20,7 +20,7 @@ def is_admin(user_id):
     return user_id == ADMIN_ID
 
 # Команда /start
-def start(update: Update, context):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     db.register_user(user.id, user.username or str(user.id))
     
@@ -42,10 +42,10 @@ def start(update: Update, context):
 
 💡 Подсказка: Установи @W1npakshambot в описании профиля и получай 5 PAK за каждое сообщение!
 """
-    update.message.reply_text(welcome_text)
+    await update.message.reply_text(welcome_text)
 
 # Команда /balance
-def balance(update: Update, context):
+async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_data = db.get_user(user_id)
     
@@ -59,12 +59,12 @@ def balance(update: Update, context):
 ⭐ 100 PAK = 10 звезд
 💰 1 рубль = 1 рубль
 """
-        update.message.reply_text(text)
+        await update.message.reply_text(text)
     else:
-        update.message.reply_text("❌ Ошибка! Попробуй /start")
+        await update.message.reply_text("❌ Ошибка! Попробуй /start")
 
 # Команда /buy
-def buy(update: Update, context):
+async def buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("Купить 100 PAK за 10⭐", callback_data="buy_pak_100")],
         [InlineKeyboardButton("Купить 500 PAK за 50⭐", callback_data="buy_pak_500")],
@@ -72,10 +72,10 @@ def buy(update: Update, context):
         [InlineKeyboardButton("Купить 10 РУБ за 10⭐", callback_data="buy_rub_10")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    update.message.reply_text("Выбери покупку:", reply_markup=reply_markup)
+    await update.message.reply_text("Выбери покупку:", reply_markup=reply_markup)
 
 # Команда /casino
-def casino(update: Update, context):
+async def casino(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("🎲 Кости", callback_data="game_dice")],
         [InlineKeyboardButton("🃏 Блэкджек", callback_data="game_blackjack")],
@@ -83,13 +83,13 @@ def casino(update: Update, context):
         [InlineKeyboardButton("💀 High Risk", callback_data="game_highrisk")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    update.message.reply_text("🎮 Выбери игру:", reply_markup=reply_markup)
+    await update.message.reply_text("🎮 Выбери игру:", reply_markup=reply_markup)
 
 # Команда /duel
-def duel(update: Update, context):
+async def duel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
     if len(args) < 3:
-        update.message.reply_text("❌ Использование: /duel @username [сумма_PAK] [сумма_РУБ]")
+        await update.message.reply_text("❌ Использование: /duel @username [сумма_PAK] [сумма_РУБ]")
         return
     
     opponent = args[0]
@@ -97,47 +97,47 @@ def duel(update: Update, context):
         bet_pak = int(args[1])
         bet_rub = int(args[2])
     except ValueError:
-        update.message.reply_text("❌ Ставки должны быть числами!")
+        await update.message.reply_text("❌ Ставки должны быть числами!")
         return
     
-    update.message.reply_text(f"⚔️ Вы вызвали на дуэль {opponent}!\nСтавка: {bet_pak} PAK и {bet_rub} РУБ\nЖдите ответа...")
+    await update.message.reply_text(f"⚔️ Вы вызвали на дуэль {opponent}!\nСтавка: {bet_pak} PAK и {bet_rub} РУБ\nЖдите ответа...")
 
 # Команда /duel_accept
-def duel_accept(update: Update, context):
-    update.message.reply_text("⚔️ Вы приняли дуэль! Бросаем кубики...")
+async def duel_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("⚔️ Вы приняли дуэль! Бросаем кубики...")
 
 # Команда /leaderboard
-def leaderboard(update: Update, context):
+async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     top_users = db.get_leaderboard(10)
     
     if not top_users:
-        update.message.reply_text("🏆 Пока нет игроков!")
+        await update.message.reply_text("🏆 Пока нет игроков!")
         return
     
     text = "🏆 Топ 10 игроков:\n\n"
     for i, user in enumerate(top_users, 1):
         text += f"{i}. {user[0]}: 💎{user[1]} PAK | 💵{user[2]} РУБ\n"
     
-    update.message.reply_text(text)
+    await update.message.reply_text(text)
 
 # Команда /clan
-def clan(update: Update, context):
+async def clan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("📋 Список кланов", callback_data="clan_list")],
         [InlineKeyboardButton("➕ Создать клан", callback_data="clan_create")],
         [InlineKeyboardButton("👥 Мои кланы", callback_data="clan_my")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    update.message.reply_text("👥 Управление кланами:", reply_markup=reply_markup)
+    await update.message.reply_text("👥 Управление кланами:", reply_markup=reply_markup)
 
 # Команда /give (только для админа)
-def give(update: Update, context):
+async def give(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
-        update.message.reply_text("❌ Недостаточно прав!")
+        await update.message.reply_text("❌ Недостаточно прав!")
         return
     
     if len(context.args) < 3:
-        update.message.reply_text("❌ Использование: /give @username PAK РУБ")
+        await update.message.reply_text("❌ Использование: /give @username PAK РУБ")
         return
     
     username = context.args[0].replace('@', '')
@@ -145,13 +145,13 @@ def give(update: Update, context):
         pak = int(context.args[1])
         rub = int(context.args[2])
     except ValueError:
-        update.message.reply_text("❌ Суммы должны быть числами!")
+        await update.message.reply_text("❌ Суммы должны быть числами!")
         return
     
-    update.message.reply_text(f"✅ Выдано {pak} PAK и {rub} РУБ пользователю @{username}")
+    await update.message.reply_text(f"✅ Выдано {pak} PAK и {rub} РУБ пользователю @{username}")
 
 # Обработка сообщений
-def handle_message(update: Update, context):
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Проверяем, что это не команда
     if update.message.text and update.message.text.startswith('/'):
         return
@@ -167,74 +167,65 @@ def handle_message(update: Update, context):
         if user.bio and "W1npakshambot" in user.bio:
             db.update_balance(user_id, MSG_REWARD, 0)
             db.update_message_time(user_id)
-            update.message.reply_text(f"💎 +{MSG_REWARD} PAK за сообщение!")
+            await update.message.reply_text(f"💎 +{MSG_REWARD} PAK за сообщение!")
 
 # Обработка callback запросов
-def handle_callback(update: Update, context):
+async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    query.answer()
+    await query.answer()
     
     if query.data.startswith("buy_"):
-        query.edit_message_text("🛒 Покупка через Telegram Stars. Функция в разработке!")
+        await query.edit_message_text("🛒 Покупка через Telegram Stars. Функция в разработке!")
     elif query.data.startswith("game_"):
-        query.edit_message_text("🎮 Игра в разработке! Скоро появится.")
+        await query.edit_message_text("🎮 Игра в разработке! Скоро появится.")
     elif query.data == "clan_list":
         clans = db.get_all_clans()
         if clans:
             text = "📋 Доступные кланы:\n\n"
             for clan in clans:
                 text += f"🏰 {clan[1]}: {clan[2]}\n"
-            query.edit_message_text(text)
+            await query.edit_message_text(text)
         else:
-            query.edit_message_text("❌ Нет доступных кланов")
+            await query.edit_message_text("❌ Нет доступных кланов")
     elif query.data == "clan_create":
-        query.edit_message_text("🏰 Функция создания клана в разработке!")
+        await query.edit_message_text("🏰 Функция создания клана в разработке!")
     elif query.data == "clan_my":
         user_id = query.from_user.id
         user_data = db.get_user(user_id)
         if user_data and user_data[4]:
-            query.edit_message_text("👥 Вы состоите в клане!")
+            await query.edit_message_text("👥 Вы состоите в клане!")
         else:
-            query.edit_message_text("❌ Вы не состоите в клане")
+            await query.edit_message_text("❌ Вы не состоите в клане")
     else:
-        query.edit_message_text("🛒 Функция в разработке!")
+        await query.edit_message_text("🛒 Функция в разработке!")
 
-# ГЛАВНАЯ ФУНКЦИЯ - УПРОЩЕННЫЙ ВАРИАНТ
+# ГЛАВНАЯ ФУНКЦИЯ
 def main():
     """Запуск бота"""
     print("🚀 Запуск бота W1nPAK...")
     
-    try:
-        # Создаем updater (простой способ)
-        updater = Updater(TOKEN)
-        dp = updater.dispatcher
-        
-        # Регистрация команд
-        dp.add_handler(CommandHandler("start", start))
-        dp.add_handler(CommandHandler("balance", balance))
-        dp.add_handler(CommandHandler("buy", buy))
-        dp.add_handler(CommandHandler("casino", casino))
-        dp.add_handler(CommandHandler("duel", duel))
-        dp.add_handler(CommandHandler("duel_accept", duel_accept))
-        dp.add_handler(CommandHandler("leaderboard", leaderboard))
-        dp.add_handler(CommandHandler("clan", clan))
-        dp.add_handler(CommandHandler("give", give))
-        dp.add_handler(CommandHandler("help", start))
-        
-        # Обработчик сообщений
-        dp.add_handler(MessageHandler(None, handle_message))
-        dp.add_handler(CallbackQueryHandler(handle_callback))
-        
-        # Запуск бота
-        print("✅ Бот успешно запущен и готов к работе!")
-        print("🤖 Бот начал polling...")
-        updater.start_polling()
-        updater.idle()
-        
-    except Exception as e:
-        print(f"❌ Ошибка при запуске бота: {e}")
-        import traceback
-        traceback.print_exc()
+    # Создаем приложение
+    application = Application.builder().token(TOKEN).build()
+    
+    # Регистрация команд
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("balance", balance))
+    application.add_handler(CommandHandler("buy", buy))
+    application.add_handler(CommandHandler("casino", casino))
+    application.add_handler(CommandHandler("duel", duel))
+    application.add_handler(CommandHandler("duel_accept", duel_accept))
+    application.add_handler(CommandHandler("leaderboard", leaderboard))
+    application.add_handler(CommandHandler("clan", clan))
+    application.add_handler(CommandHandler("give", give))
+    application.add_handler(CommandHandler("help", start))
+    
+    # Обработчики сообщений
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_handler(CallbackQueryHandler(handle_callback))
+    
+    # Запуск бота
+    print("✅ Бот успешно запущен и готов к работе!")
+    application.run_polling()
 
 if __name__ == '__main__':
     main()
