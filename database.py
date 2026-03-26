@@ -8,7 +8,7 @@ class Database:
         self.create_tables()
     
     def create_tables(self):
-        # Таблица пользователей
+        # Таблица пользователей (расширенная)
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
@@ -17,6 +17,10 @@ class Database:
                 rub_balance INTEGER DEFAULT 0,
                 last_message_time TIMESTAMP,
                 last_clan_reward TIMESTAMP,
+                last_farm_collect TIMESTAMP,
+                farm_level INTEGER DEFAULT 0,
+                farm_rate INTEGER DEFAULT 2,
+                total_farm_earned INTEGER DEFAULT 0,
                 in_clan INTEGER DEFAULT NULL,
                 clan_role TEXT DEFAULT NULL
             )
@@ -71,13 +75,29 @@ class Database:
             )
         ''')
         
+        # Таблица заявок на вывод
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS withdrawal_requests (
+                request_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                amount_rub INTEGER,
+                status TEXT DEFAULT 'pending',
+                created_at TIMESTAMP
+            )
+        ''')
+        
         self.conn.commit()
     
+    # ============ ОСНОВНЫЕ МЕТОДЫ ============
+    
     def register_user(self, user_id, username):
+        now = datetime.now()
         self.cursor.execute('''
-            INSERT OR IGNORE INTO users (user_id, username, last_message_time, last_clan_reward)
-            VALUES (?, ?, ?, ?)
-        ''', (user_id, username, datetime.now(), datetime.now()))
+            INSERT OR IGNORE INTO users (
+                user_id, username, last_message_time, 
+                last_clan_reward, last_farm_collect, farm_rate
+            ) VALUES (?, ?, ?, ?, ?, ?)
+        ''', (user_id, username, now, now, now, 2))
         self.conn.commit()
     
     def get_user(self, user_id):
@@ -111,7 +131,91 @@ class Database:
         ''', (datetime.now(), user_id))
         self.conn.commit()
     
-    # ============ МЕТОДЫ ДЛЯ КЛАНОВ ============
+    # ============ ФЕРМА ============
+    
+    def get_farm_info(self, user_id):
+        self.cursor.execute('''
+            SELECT farm_level, farm_rate, total_farm_earned, last_farm_collect 
+            FROM users WHERE user_id = ?
+        ''', (user_id,))
+        return self.cursor.fetchone()
+    
+    def get_farm_available(self, user_id):
+        self.cursor.execute('''
+            SELECT last_farm_collect, farm_rate FROM users WHERE user_id = ?
+        ''', (user_id,))
+        result = self.cursor.fetchone()
+        
+        if result and result[0]:
+            last_collect = datetime.fromisoformat(result[0])
+            hours_passed = (datetime.now() - last_collect).total_seconds() / 3600
+            if hours_passed >= 1:
+                return True, int(hours_passed * result[1])  # Возвращаем True и количество PAK
+        return False, 0
+    
+    def collect_farm(self, user_id):
+        self.cursor.execute('''
+            SELECT farm_rate, total_farm_earned, last_farm_collect FROM users WHERE user_id = ?
+        ''', (user_id,))
+        result = self.cursor.fetchone()
+        
+        if result:
+            rate = result[0]
+            last_collect = datetime.fromisoformat(result[2])
+            hours_passed = int((datetime.now() - last_collect).total_seconds() / 3600)
+            
+            if hours_passed >= 1:
+                earned = hours_passed * rate
+                self.cursor.execute('''
+                    UPDATE users 
+                    SET pak_balance = pak_balance + ?,
+                        total_farm_earned = total_farm_earned + ?,
+                        last_farm_collect = ?
+                    WHERE user_id = ?
+                ''', (earned, earned, datetime.now(), user_id))
+                self.conn.commit()
+                return earned
+        return 0
+    
+    def upgrade_farm(self, user_id):
+        self.cursor.execute('''
+            SELECT farm_level, farm_rate FROM users WHERE user_id = ?
+        ''', (user_id,))
+        result = self.cursor.fetchone()
+        
+        if result:
+            level = result[0]
+            current_rate = result[1]
+            upgrade_cost = 100 + (level * 100)  # 100, 200, 300, 400...
+            
+            self.cursor.execute('SELECT pak_balance FROM users WHERE user_id = ?', (user_id,))
+            balance = self.cursor.fetchone()
+            
+            if balance and balance[0] >= upgrade_cost:
+                new_rate = current_rate + 1
+                new_level = level + 1
+                
+                self.cursor.execute('''
+                    UPDATE users 
+                    SET pak_balance = pak_balance - ?,
+                        farm_level = ?,
+                        farm_rate = ?
+                    WHERE user_id = ?
+                ''', (upgrade_cost, new_level, new_rate, user_id))
+                self.conn.commit()
+                return True, upgrade_cost, new_level, new_rate
+        return False, 0, 0, 0
+    
+    def get_farm_leaderboard(self, limit=10):
+        self.cursor.execute('''
+            SELECT username, farm_level, farm_rate, total_farm_earned 
+            FROM users 
+            ORDER BY total_farm_earned DESC 
+            LIMIT ?
+        ''', (limit,))
+        return self.cursor.fetchall()
+    
+    # ============ КЛАНЫ (ОБНОВЛЕННЫЕ) ============
     
     def create_clan(self, name, description, owner_id):
         try:
@@ -131,7 +235,12 @@ class Database:
             return None
     
     def get_all_clans(self):
-        self.cursor.execute('SELECT clan_id, name, description, member_count FROM clans ORDER BY member_count DESC')
+        self.cursor.execute('''
+            SELECT c.clan_id, c.name, c.description, c.member_count,
+                   (SELECT SUM(u.pak_balance + u.rub_balance * 4) FROM users u WHERE u.in_clan = c.clan_id) as total_wealth
+            FROM clans c
+            ORDER BY total_wealth DESC
+        ''')
         return self.cursor.fetchall()
     
     def get_clan_by_id(self, clan_id):
@@ -144,7 +253,8 @@ class Database:
     
     def get_clan_members(self, clan_id):
         self.cursor.execute('''
-            SELECT user_id, username, clan_role FROM users 
+            SELECT user_id, username, clan_role, pak_balance, rub_balance 
+            FROM users 
             WHERE in_clan = ?
         ''', (clan_id,))
         return self.cursor.fetchall()
@@ -154,8 +264,14 @@ class Database:
         result = self.cursor.fetchone()
         return result[0] if result else None
     
+    def get_clan_total_wealth(self, clan_id):
+        self.cursor.execute('''
+            SELECT SUM(pak_balance + rub_balance * 4) FROM users WHERE in_clan = ?
+        ''', (clan_id,))
+        result = self.cursor.fetchone()
+        return result[0] if result[0] else 0
+    
     def send_clan_request(self, clan_id, user_id):
-        # Проверяем, нет ли уже заявки
         self.cursor.execute('''
             SELECT * FROM clan_requests WHERE clan_id = ? AND user_id = ? AND status = 'pending'
         ''', (clan_id, user_id))
@@ -186,18 +302,15 @@ class Database:
         
         user_id = result[0]
         
-        # Обновляем статус заявки
         self.cursor.execute('''
             UPDATE clan_requests SET status = 'accepted' WHERE request_id = ?
         ''', (request_id,))
         
-        # Добавляем пользователя в клан
         self.cursor.execute('''
             UPDATE users SET in_clan = ?, clan_role = 'member'
             WHERE user_id = ?
         ''', (clan_id, user_id))
         
-        # Увеличиваем счетчик участников
         self.cursor.execute('''
             UPDATE clans SET member_count = member_count + 1 WHERE clan_id = ?
         ''', (clan_id,))
@@ -212,11 +325,114 @@ class Database:
         self.conn.commit()
     
     def remove_from_clan(self, user_id):
-        # Получаем текущий клан пользователя
         self.cursor.execute('SELECT in_clan FROM users WHERE user_id = ?', (user_id,))
         result = self.cursor.fetchone()
         if result and result[0]:
             clan_id = result[0]
-            # Уменьшаем счетчик участников
             self.cursor.execute('''
-                UPDATE clans SET member
+                UPDATE clans SET member_count = member_count - 1 WHERE clan_id = ?
+            ''', (clan_id,))
+        
+        self.cursor.execute('''
+            UPDATE users SET in_clan = NULL, clan_role = NULL
+            WHERE user_id = ?
+        ''', (user_id,))
+        self.conn.commit()
+    
+    def kick_from_clan(self, clan_id, user_id):
+        self.cursor.execute('''
+            UPDATE users SET in_clan = NULL, clan_role = NULL
+            WHERE user_id = ? AND in_clan = ?
+        ''', (user_id, clan_id))
+        
+        self.cursor.execute('''
+            UPDATE clans SET member_count = member_count - 1 WHERE clan_id = ?
+        ''', (clan_id,))
+        self.conn.commit()
+    
+    def get_clan_reward_available(self, user_id):
+        self.cursor.execute('''
+            SELECT last_clan_reward, in_clan FROM users WHERE user_id = ?
+        ''', (user_id,))
+        result = self.cursor.fetchone()
+        
+        if not result or not result[1]:
+            return False
+        
+        last_reward = datetime.fromisoformat(result[0])
+        if datetime.now() - last_reward > timedelta(hours=1):
+            return True
+        return False
+    
+    def update_clan_reward_time(self, user_id):
+        self.cursor.execute('''
+            UPDATE users SET last_clan_reward = ? WHERE user_id = ?
+        ''', (datetime.now(), user_id))
+        self.conn.commit()
+    
+    def give_clan_reward(self, user_id):
+        self.cursor.execute('''
+            UPDATE users SET pak_balance = pak_balance + ? WHERE user_id = ?
+        ''', (2, user_id))
+        self.conn.commit()
+    
+    def get_clan_leaderboard(self, limit=10):
+        self.cursor.execute('''
+            SELECT c.name, COUNT(u.user_id) as members, 
+                   SUM(u.pak_balance) as total_pak,
+                   SUM(u.rub_balance) as total_rub,
+                   SUM(u.pak_balance + u.rub_balance * 4) as total_wealth
+            FROM clans c
+            LEFT JOIN users u ON u.in_clan = c.clan_id
+            GROUP BY c.clan_id
+            ORDER BY total_wealth DESC
+            LIMIT ?
+        ''', (limit,))
+        return self.cursor.fetchall()
+    
+    # ============ ДУЭЛИ ============
+    
+    def create_duel(self, challenger_id, opponent_id, bet_pak, bet_rub):
+        self.cursor.execute('''
+            INSERT INTO duels (challenger_id, opponent_id, bet_pak, bet_rub, status, created_at)
+            VALUES (?, ?, ?, ?, 'pending', ?)
+        ''', (challenger_id, opponent_id, bet_pak, bet_rub, datetime.now()))
+        self.conn.commit()
+        return self.cursor.lastrowid
+    
+    def complete_duel(self, duel_id, winner_id):
+        self.cursor.execute('''
+            UPDATE duels SET status = 'completed', winner_id = ? WHERE duel_id = ?
+        ''', (winner_id, duel_id))
+        self.conn.commit()
+    
+    def get_user_by_username(self, username):
+        self.cursor.execute('SELECT user_id, username FROM users WHERE username = ?', (username,))
+        return self.cursor.fetchone()
+    
+    def get_leaderboard(self, limit=10):
+        self.cursor.execute('''
+            SELECT username, pak_balance, rub_balance, 
+                   (pak_balance + rub_balance * 4) as total_wealth
+            FROM users 
+            ORDER BY total_wealth DESC 
+            LIMIT ?
+        ''', (limit,))
+        return self.cursor.fetchall()
+    
+    # ============ ПОКУПКИ И ВЫВОД ============
+    
+    def add_star_purchase(self, user_id, stars, pak_gained, rub_gained):
+        self.cursor.execute('''
+            INSERT INTO star_purchases (user_id, stars, pak_gained, rub_gained, created_at)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (user_id, stars, pak_gained, rub_gained, datetime.now()))
+        self.conn.commit()
+    
+    def add_withdrawal_request(self, user_id, amount_rub):
+        self.cursor.execute('''
+            INSERT INTO withdrawal_requests (user_id, amount_rub, created_at)
+            VALUES (?, ?, ?)
+        ''', (user_id, amount_rub, datetime.now()))
+        self.conn.commit()
+        return self.cursor.lastrowid
