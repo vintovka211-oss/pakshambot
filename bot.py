@@ -1,7 +1,6 @@
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackQueryHandler
-from telegram.ext.filters import Filters  # ПРАВИЛЬНЫЙ импорт Filters
 from config import TOKEN, ADMIN_ID, MSG_REWARD
 from database import Database
 from games import CasinoGames
@@ -106,7 +105,6 @@ def duel(update: Update, context):
 # Команда /duel_accept
 def duel_accept(update: Update, context):
     update.message.reply_text("⚔️ Вы приняли дуэль! Бросаем кубики...")
-    # Здесь будет логика дуэли
 
 # Команда /leaderboard
 def leaderboard(update: Update, context):
@@ -152,8 +150,12 @@ def give(update: Update, context):
     
     update.message.reply_text(f"✅ Выдано {pak} PAK и {rub} РУБ пользователю @{username}")
 
-# Обработка сообщений
+# Обработка сообщений (без Filters)
 def handle_message(update: Update, context):
+    # Проверяем, что это не команда
+    if update.message.text and update.message.text.startswith('/'):
+        return
+    
     user_id = update.effective_user.id
     user = update.effective_user
     
@@ -219,8 +221,8 @@ def main():
         dp.add_handler(CommandHandler("give", give))
         dp.add_handler(CommandHandler("help", start))
         
-        # Обработчики сообщений
-        dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+        # Обработчик сообщений (без Filters)
+        dp.add_handler(MessageHandler(None, handle_message))
         dp.add_handler(CallbackQueryHandler(handle_callback))
         
         # Запуск бота
