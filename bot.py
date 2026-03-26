@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ContextTypes
@@ -199,8 +200,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await query.edit_message_text("🛒 Функция в разработке!")
 
-# ГЛАВНАЯ ФУНКЦИЯ
-def main():
+# ГЛАВНАЯ ФУНКЦИЯ - ИСПРАВЛЕНА
+async def main():
     """Запуск бота"""
     print("🚀 Запуск бота W1nPAK...")
     
@@ -226,7 +227,12 @@ def main():
         
         # Запуск бота
         print("✅ Бот успешно запущен и готов к работе!")
-        application.run_polling()
+        await application.initialize()
+        await application.start()
+        await application.updater.start_polling()
+        
+        # Держим бота запущенным
+        await asyncio.Event().wait()
         
     except Exception as e:
         print(f"❌ Ошибка при запуске бота: {e}")
@@ -234,4 +240,4 @@ def main():
         traceback.print_exc()
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())
