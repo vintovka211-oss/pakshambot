@@ -69,654 +69,250 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode='Markdown'
     )
 
-# ========== БАЛАНС ==========
-async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    balances = load_json(BALANCE_FILE)
-    balance = balances.get(user_id, 0)
-    rub = balance / RUB_TO_PAK
-    await update.message.reply_text(
-        f"💰 Баланс: {balance:.0f} PAK ({rub:.2f} ₽)",
-        reply_markup=get_main_menu()
-    )
-
-# ========== ИГРА 1: КУБИК ==========
-async def play_dice_game(update, bet, choice_name):
-    user_id = str(update.effective_user.id)
-    balances = load_json(BALANCE_FILE)
-    current_balance = balances.get(user_id, 0)
-    
-    if bet > current_balance:
-        await update.message.reply_text(f"❌ Недостаточно средств! Баланс: {current_balance:.0f} PAK")
-        return
-    
-    dice = random.randint(1, 6)
-    is_even = dice % 2 == 0
-    
-    if choice_name == "even":
-        player_wins = is_even
-        player_choice = "ЧЕТНОЕ"
-    else:
-        player_wins = not is_even
-        player_choice = "НЕЧЕТНОЕ"
-    
-    dice_emoji = ["🎲", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"]
-    
-    if player_wins:
-        win_amount = int(bet * 1.8)
-        new_balance = current_balance - bet + win_amount
-        balances[user_id] = new_balance
-        save_json(BALANCE_FILE, balances)
-        
-        await update.message.reply_text(
-            f"🎲 **КУБИК**\n\n"
-            f"Выпало: {dice_emoji[dice]} {dice}\n"
-            f"Твой выбор: {player_choice}\n\n"
-            f"✅ ВЫИГРЫШ! (x1.8)\n"
-            f"💰 Ставка: {bet} PAK\n"
-            f"🎉 Выигрыш: {win_amount} PAK\n"
-            f"📊 Новый баланс: {new_balance:.0f} PAK",
-            parse_mode='Markdown'
-        )
-    else:
-        new_balance = current_balance - bet
-        balances[user_id] = new_balance
-        save_json(BALANCE_FILE, balances)
-        
-        await update.message.reply_text(
-            f"🎲 **КУБИК**\n\n"
-            f"Выпало: {dice_emoji[dice]} {dice}\n"
-            f"Твой выбор: {player_choice}\n\n"
-            f"❌ ПРОИГРЫШ!\n"
-            f"💰 Потеряно: {bet} PAK\n"
-            f"📊 Новый баланс: {new_balance:.0f} PAK",
-            parse_mode='Markdown'
-        )
-
-# ========== ИГРА 2: МНОЖИТЕЛЬ ==========
-async def play_multiplier_game(update, bet, chosen_number):
-    user_id = str(update.effective_user.id)
-    multipliers = [0.25, 0.5, 0.75, 1.0, 1.1, 1.2, 1.3, 1.5]
-    random.shuffle(multipliers)
-    multiplier = multipliers[chosen_number - 1]
-    
-    balances = load_json(BALANCE_FILE)
-    current_balance = balances.get(user_id, 0)
-    
-    if bet > current_balance:
-        await update.message.reply_text(f"❌ Недостаточно средств! Баланс: {current_balance:.0f} PAK")
-        return
-    
-    win_amount = int(bet * multiplier)
-    new_balance = current_balance - bet + win_amount
-    balances[user_id] = new_balance
-    save_json(BALANCE_FILE, balances)
-    
-    if multiplier < 1:
-        result = "❌ ПРОИГРЫШ!"
-    elif multiplier == 1:
-        result = "🔄 НИЧЬЯ (вернули ставку)"
-    else:
-        result = "✅ ВЫИГРЫШ!"
-    
-    await update.message.reply_text(
-        f"🎰 **МНОЖИТЕЛЬ**\n\n"
-        f"Твой выбор: цифра {chosen_number}\n"
-        f"🎲 Выпал множитель: x{multiplier}\n"
-        f"{result}\n"
-        f"💰 Ставка: {bet} PAK\n"
-        f"🎉 Результат: {win_amount} PAK\n"
-        f"📊 Новый баланс: {new_balance:.0f} PAK",
-        parse_mode='Markdown'
-    )
-
-# ========== ИГРА 3: РУЛЕТКА ==========
-async def play_roulette_game(update, bet, choice):
-    user_id = str(update.effective_user.id)
-    balances = load_json(BALANCE_FILE)
-    current_balance = balances.get(user_id, 0)
-    
-    if bet > current_balance:
-        await update.message.reply_text(f"❌ Недостаточно средств! Баланс: {current_balance:.0f} PAK")
-        return
-    
-    result = random.randint(0, 36)
-    win_amount = 0
-    
-    if isinstance(choice, int) and choice == result:
-        win_amount = bet * 35
-        result_text = f"✅ ВЫИГРЫШ! x35"
-    elif choice == "red" and result in [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]:
-        win_amount = bet * 2
-        result_text = f"✅ ВЫИГРЫШ! x2"
-    elif choice == "black" and result in [2,4,6,8,10,11,13,15,17,20,22,24,26,28,29,31,33,35]:
-        win_amount = bet * 2
-        result_text = f"✅ ВЫИГРЫШ! x2"
-    elif choice == "even" and result % 2 == 0 and result != 0:
-        win_amount = bet * 2
-        result_text = f"✅ ВЫИГРЫШ! x2"
-    elif choice == "odd" and result % 2 != 0:
-        win_amount = bet * 2
-        result_text = f"✅ ВЫИГРЫШ! x2"
-    else:
-        result_text = "❌ ПРОИГРЫШ!"
-    
-    if win_amount > 0:
-        new_balance = current_balance - bet + win_amount
-        balances[user_id] = new_balance
-        save_json(BALANCE_FILE, balances)
-    else:
-        new_balance = current_balance - bet
-        balances[user_id] = new_balance
-        save_json(BALANCE_FILE, balances)
-    
-    await update.message.reply_text(
-        f"🎡 **РУЛЕТКА**\n\n"
-        f"Выпало число: {result}\n"
-        f"{result_text}\n"
-        f"💰 Ставка: {bet} PAK\n"
-        f"🎉 Результат: {win_amount} PAK\n"
-        f"📊 Новый баланс: {new_balance:.0f} PAK",
-        parse_mode='Markdown'
-    )
-
-# ========== ИГРА 4: СЛОТЫ ==========
-async def play_slots_game(update, bet):
-    user_id = str(update.effective_user.id)
-    balances = load_json(BALANCE_FILE)
-    current_balance = balances.get(user_id, 0)
-    
-    if bet > current_balance:
-        await update.message.reply_text(f"❌ Недостаточно средств! Баланс: {current_balance:.0f} PAK")
-        return
-    
-    symbols = ["🍒", "🍋", "🍊", "🍉", "⭐", "7️⃣", "💎"]
-    reel1 = random.choice(symbols)
-    reel2 = random.choice(symbols)
-    reel3 = random.choice(symbols)
-    
-    win_amount = 0
-    
-    if reel1 == reel2 == reel3:
-        if reel1 == "7️⃣":
-            win_amount = bet * 50
-        elif reel1 == "💎":
-            win_amount = bet * 25
-        elif reel1 == "⭐":
-            win_amount = bet * 10
-        else:
-            win_amount = bet * 5
-    elif reel1 == reel2 or reel2 == reel3 or reel1 == reel3:
-        win_amount = bet * 2
-    
-    if win_amount > 0:
-        new_balance = current_balance - bet + win_amount
-        balances[user_id] = new_balance
-        save_json(BALANCE_FILE, balances)
-        result_text = f"✅ ВЫИГРЫШ! x{win_amount//bet}"
-    else:
-        new_balance = current_balance - bet
-        balances[user_id] = new_balance
-        save_json(BALANCE_FILE, balances)
-        result_text = "❌ ПРОИГРЫШ!"
-    
-    await update.message.reply_text(
-        f"🎰 **СЛОТЫ**\n\n"
-        f"┌─────┬─────┬─────┐\n"
-        f"│  {reel1}  │  {reel2}  │  {reel3}  │\n"
-        f"└─────┴─────┴─────┘\n\n"
-        f"{result_text}\n"
-        f"💰 Ставка: {bet} PAK\n"
-        f"🎉 Выигрыш: {win_amount} PAK\n"
-        f"📊 Новый баланс: {new_balance:.0f} PAK",
-        parse_mode='Markdown'
-    )
-
-# ========== ИГРА 5: КАМЕНЬ-НОЖНИЦЫ-БУМАГА ==========
-async def play_rps_game(update, bet, choice):
-    user_id = str(update.effective_user.id)
-    choices = {"камень": "✊", "ножницы": "✌️", "бумага": "✋"}
-    bot_choice = random.choice(list(choices.keys()))
-    
-    balances = load_json(BALANCE_FILE)
-    current_balance = balances.get(user_id, 0)
-    
-    if bet > current_balance:
-        await update.message.reply_text(f"❌ Недостаточно средств! Баланс: {current_balance:.0f} PAK")
-        return
-    
-    if choice == bot_choice:
-        win_amount = bet
-        result = "🔄 НИЧЬЯ"
-    elif (choice == "камень" and bot_choice == "ножницы") or \
-         (choice == "ножницы" and bot_choice == "бумага") or \
-         (choice == "бумага" and bot_choice == "камень"):
-        win_amount = bet * 2
-        result = "✅ ВЫИГРЫШ!"
-    else:
-        win_amount = 0
-        result = "❌ ПРОИГРЫШ!"
-    
-    if win_amount > 0:
-        new_balance = current_balance - bet + win_amount
-        balances[user_id] = new_balance
-        save_json(BALANCE_FILE, balances)
-    else:
-        new_balance = current_balance - bet
-        balances[user_id] = new_balance
-        save_json(BALANCE_FILE, balances)
-    
-    await update.message.reply_text(
-        f"✊ **КАМЕНЬ-НОЖНИЦЫ-БУМАГА**\n\n"
-        f"Твой выбор: {choices[choice]}\n"
-        f"Выбор бота: {choices[bot_choice]}\n\n"
-        f"{result}\n"
-        f"💰 Ставка: {bet} PAK\n"
-        f"🎉 Результат: {win_amount} PAK\n"
-        f"📊 Новый баланс: {new_balance:.0f} PAK",
-        parse_mode='Markdown'
-    )
-
-# ========== ИГРА 6: БЛЭКДЖЕК ==========
-async def play_blackjack_game(update, bet):
-    user_id = str(update.effective_user.id)
-    balances = load_json(BALANCE_FILE)
-    current_balance = balances.get(user_id, 0)
-    
-    if bet > current_balance:
-        await update.message.reply_text(f"❌ Недостаточно средств! Баланс: {current_balance:.0f} PAK")
-        return
-    
-    def get_card():
-        return random.randint(1, 11)
-    
-    player_cards = [get_card(), get_card()]
-    dealer_cards = [get_card(), get_card()]
-    player_sum = sum(player_cards)
-    dealer_sum = sum(dealer_cards)
-    
-    while player_sum < 17:
-        player_cards.append(get_card())
-        player_sum = sum(player_cards)
-    
-    if player_sum > 21:
-        new_balance = current_balance - bet
-        balances[user_id] = new_balance
-        save_json(BALANCE_FILE, balances)
-        await update.message.reply_text(
-            f"🃏 **БЛЭКДЖЕК**\n\n"
-            f"Твои карты: {player_cards} (сумма {player_sum})\n\n"
-            f"❌ ПЕРЕБОР!\n"
-            f"💰 Потеряно: {bet} PAK\n"
-            f"📊 Новый баланс: {new_balance:.0f} PAK",
-            parse_mode='Markdown'
-        )
-        return
-    
-    while dealer_sum < 17:
-        dealer_cards.append(get_card())
-        dealer_sum = sum(dealer_cards)
-    
-    if dealer_sum > 21 or player_sum > dealer_sum:
-        win_amount = bet * 2
-        new_balance = current_balance - bet + win_amount
-        balances[user_id] = new_balance
-        save_json(BALANCE_FILE, balances)
-        await update.message.reply_text(
-            f"🃏 **БЛЭКДЖЕК**\n\n"
-            f"Твои карты: {player_cards} (сумма {player_sum})\n"
-            f"Карты дилера: {dealer_cards} (сумма {dealer_sum})\n\n"
-            f"✅ ВЫИГРЫШ!\n"
-            f"💰 Ставка: {bet} PAK\n"
-            f"🎉 Выигрыш: {win_amount} PAK\n"
-            f"📊 Новый баланс: {new_balance:.0f} PAK",
-            parse_mode='Markdown'
-        )
-    else:
-        new_balance = current_balance - bet
-        balances[user_id] = new_balance
-        save_json(BALANCE_FILE, balances)
-        await update.message.reply_text(
-            f"🃏 **БЛЭКДЖЕК**\n\n"
-            f"Твои карты: {player_cards} (сумма {player_sum})\n"
-            f"Карты дилера: {dealer_cards} (сумма {dealer_sum})\n\n"
-            f"❌ ПРОИГРЫШ!\n"
-            f"💰 Потеряно: {bet} PAK\n"
-            f"📊 Новый баланс: {new_balance:.0f} PAK",
-            parse_mode='Markdown'
-        )
-
-# ========== ИГРА 7: КОСТИ (СУММА) ==========
-async def play_dice_sum_game(update, bet, target_sum):
-    user_id = str(update.effective_user.id)
-    balances = load_json(BALANCE_FILE)
-    current_balance = balances.get(user_id, 0)
-    
-    if bet > current_balance:
-        await update.message.reply_text(f"❌ Недостаточно средств! Баланс: {current_balance:.0f} PAK")
-        return
-    
-    dice1 = random.randint(1, 6)
-    dice2 = random.randint(1, 6)
-    total = dice1 + dice2
-    
-    multipliers = {7: 5, 8: 3, 9: 2.5, 10: 2, 11: 3, 12: 5}
-    multiplier = multipliers.get(target_sum, 0)
-    
-    if total == target_sum and multiplier > 0:
-        win_amount = int(bet * multiplier)
-        new_balance = current_balance - bet + win_amount
-        balances[user_id] = new_balance
-        save_json(BALANCE_FILE, balances)
-        
-        await update.message.reply_text(
-            f"🎲 **КОСТИ**\n\n"
-            f"Выпало: {dice1} + {dice2} = {total}\n"
-            f"Твоя ставка: сумма {target_sum}\n\n"
-            f"✅ ВЫИГРЫШ! x{multiplier}\n"
-            f"💰 Ставка: {bet} PAK\n"
-            f"🎉 Выигрыш: {win_amount} PAK\n"
-            f"📊 Новый баланс: {new_balance:.0f} PAK",
-            parse_mode='Markdown'
-        )
-    else:
-        new_balance = current_balance - bet
-        balances[user_id] = new_balance
-        save_json(BALANCE_FILE, balances)
-        
-        await update.message.reply_text(
-            f"🎲 **КОСТИ**\n\n"
-            f"Выпало: {dice1} + {dice2} = {total}\n"
-            f"Твоя ставка: сумма {target_sum}\n\n"
-            f"❌ ПРОИГРЫШ!\n"
-            f"💰 Потеряно: {bet} PAK\n"
-            f"📊 Новый баланс: {new_balance:.0f} PAK",
-            parse_mode='Markdown'
-        )
-
-# ========== ЕЖЕДНЕВНЫЙ БОНУС ==========
-async def daily_bonus(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    daily_data = load_json(DAILY_BONUS_FILE)
-    
-    last_bonus = daily_data.get(user_id, 0)
-    current_time = time.time()
-    
-    if current_time - last_bonus < 86400:
-        time_left = 86400 - (current_time - last_bonus)
-        hours = int(time_left // 3600)
-        minutes = int((time_left % 3600) // 60)
-        await update.message.reply_text(f"❌ Бонус уже получен! Следующий через: {hours}ч {minutes}м")
-        return
-    
-    balances = load_json(BALANCE_FILE)
-    balances[user_id] = balances.get(user_id, 0) + DAILY_BONUS
-    save_json(BALANCE_FILE, balances)
-    
-    daily_data[user_id] = current_time
-    save_json(DAILY_BONUS_FILE, daily_data)
-    
-    await update.message.reply_text(
-        f"🎁 Бонус! +{DAILY_BONUS} PAK\n💰 Новый баланс: {balances[user_id]:.0f} PAK",
-        reply_markup=get_main_menu()
-    )
-
-# ========== ТОП ИГРОКОВ ==========
-async def top_players(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    balances = load_json(BALANCE_FILE)
-    sorted_players = sorted(balances.items(), key=lambda x: x[1], reverse=True)[:10]
-    
-    if not sorted_players:
-        await update.message.reply_text("📊 Топ игроков пока пуст!")
-        return
-    
-    top_text = "🏆 **ТОП 10 ИГРОКОВ** 🏆\n\n"
-    for i, (user_id, balance) in enumerate(sorted_players, 1):
-        try:
-            user = await context.bot.get_chat(int(user_id))
-            name = user.first_name[:15] if user.first_name else f"User_{user_id[:5]}"
-        except:
-            name = f"User_{user_id[:5]}"
-        
-        medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else "🔹"
-        rub = balance / RUB_TO_PAK
-        top_text += f"{medal} {i}. {name} — {balance:.0f} PAK ({rub:.2f} ₽)\n"
-    
-    await update.message.reply_text(top_text, parse_mode='Markdown')
-
-# ========== СЕКРЕТНАЯ КОМАНДА ДЛЯ АДМИНА ==========
-async def secret_give_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    if user_id != ADMIN_ID:
-        return
-    
-    if not context.args:
-        await update.message.reply_text("❌ /give [сумма] - выдать PAK")
-        return
-    
-    try:
-        amount = int(context.args[0])
-        balances = load_json(BALANCE_FILE)
-        balances[user_id] = balances.get(user_id, 0) + amount
-        save_json(BALANCE_FILE, balances)
-        rub = amount / RUB_TO_PAK
-        await update.message.reply_text(f"✅ Выдано {amount} PAK ({rub:.2f} ₽)\n💰 Новый баланс: {balances[user_id]:.0f} PAK")
-    except ValueError:
-        await update.message.reply_text("❌ Сумма должна быть числом!")
-
 # ========== ОБРАБОТЧИК КНОПОК ==========
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
-    user_id = str(query.from_user.id)
+    if query.data == 'menu':
+        await query.edit_message_text(
+            "Главное меню:",
+            reply_markup=get_main_menu()
+        )
+    elif query.data == 'games_menu':
+        await query.edit_message_text(
+            "🎮 Выберите игру:",
+            reply_markup=get_games_menu()
+        )
+    elif query.data == 'balance':
+        await show_balance(update, context, query)
+    elif query.data == 'daily':
+        await daily_bonus(update, context, query)
+    elif query.data == 'top':
+        await show_top(update, context, query)
+    elif query.data == 'dice_game':
+        await dice_game(update, context, query)
+    elif query.data == 'multiplier_game':
+        await multiplier_game(update, context, query)
+    elif query.data == 'roulette_game':
+        await roulette_game(update, context, query)
+    elif query.data == 'slots_game':
+        await slots_game(update, context, query)
+    elif query.data == 'rps_game':
+        await rps_game(update, context, query)
+    elif query.data == 'blackjack_game':
+        await blackjack_game(update, context, query)
+    elif query.data == 'dice_sum_game':
+        await dice_sum_game(update, context, query)
+
+# ========== ПОКАЗАТЬ БАЛАНС ==========
+async def show_balance(update: Update, context: ContextTypes.DEFAULT_TYPE, query=None):
+    user_id = str(update.effective_user.id)
     balances = load_json(BALANCE_FILE)
     balance = balances.get(user_id, 0)
     
-    if query.data == 'balance':
-        rub = balance / RUB_TO_PAK
-        await query.edit_message_text(f"💰 Баланс: {balance:.0f} PAK ({rub:.2f} ₽)", reply_markup=get_main_menu())
+    text = f"💰 Ваш баланс: **{balance} PAK**\n\n💵 {balance // RUB_TO_PAK} ₽"
     
-    elif query.data == 'games_menu':
-        await query.edit_message_text("🎮 **Выбери игру:**", reply_markup=get_games_menu(), parse_mode='Markdown')
+    if query:
+        await query.edit_message_text(text, parse_mode='Markdown', reply_markup=get_main_menu())
+    else:
+        await update.message.reply_text(text, parse_mode='Markdown', reply_markup=get_main_menu())
+
+# ========== ЕЖЕДНЕВНЫЙ БОНУС ==========
+async def daily_bonus(update: Update, context: ContextTypes.DEFAULT_TYPE, query=None):
+    user_id = str(update.effective_user.id)
+    daily_data = load_json(DAILY_BONUS_FILE)
+    balances = load_json(BALANCE_FILE)
     
-    elif query.data == 'dice_game':
-        await query.edit_message_text(
-            f"🎲 **Кубик**\n\n💰 Баланс: {balance:.0f} PAK\n\nНапиши:\n• чет 100\n• нечет 50\n\nВыигрыш x1.8!",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='games_menu')]])
-        )
+    last_claim = daily_data.get(user_id, 0)
+    current_time = time.time()
     
-    elif query.data == 'multiplier_game':
-        await query.edit_message_text(
-            f"🎰 **Множитель**\n\n💰 Баланс: {balance:.0f} PAK\n\nНапиши: множитель 100 5\n(цифра 1-8)",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='games_menu')]])
-        )
-    
-    elif query.data == 'roulette_game':
-        await query.edit_message_text(
-            f"🎡 **Рулетка**\n\n💰 Баланс: {balance:.0f} PAK\n\nНапиши:\n• рулетка 100 7\n• рулетка 100 red\n• рулетка 100 even",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='games_menu')]])
-        )
-    
-    elif query.data == 'slots_game':
-        await query.edit_message_text(
-            f"🎰 **Слоты**\n\n💰 Баланс: {balance:.0f} PAK\n\nНапиши: слоты 100\n\nДжекпот 5000 PAK!",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='games_menu')]])
-        )
-    
-    elif query.data == 'rps_game':
-        await query.edit_message_text(
-            f"✊ **Камень**Камень-Ножницы-Бумага**\n\n💰 Баланс: {balance:.0f} PAK\n\nНапиши: кнб 100 камень",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='games_menu')]])
-        )
-    
-    elif query.data == 'blackjack_game':
-        await query.edit_message_text(
-            f"🃏 **Блэкджек**\n\n💰 Баланс: {balance:.0f} PAK\n\nНапиши: блэкджек 100",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='games_menu')]])
-        )
-    
-    elif query.data == 'dice_sum_game':
-        await query.edit_message_text(
-            f"🎲 **Кости (Сумма)**\n\n💰 Баланс: {balance:.0f} PAK\n\nНапиши: кости 100 7\n(сумма 7-12)\n\nВыигрыши:\n7 или 12 → x5\n8 или 11 → x3\n9 или 10 → x2",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='games_menu')]])
-        )
-    
-    elif query.data == 'daily':
-        daily_data = load_json(DAILY_BONUS_FILE)
-        last_bonus = daily_data.get(user_id, 0)
-        current_time = time.time()
+    if current_time - last_claim >= 86400:  # 24 часа
+        balances[user_id] = balances.get(user_id, 0) + DAILY_BONUS
+        daily_data[user_id] = current_time
+        save_json(BALANCE_FILE, balances)
+        save_json(DAILY_BONUS_FILE, daily_data)
         
-        if current_time - last_bonus < 86400:
-            time_left = 86400 - (current_time - last_bonus)
-            hours = int(time_left // 3600)
-            minutes = int((time_left % 3600) // 60)
-            await query.edit_message_text(
-                f"❌ Бонус уже получен!\n⏱️ Следующий через: {hours}ч {minutes}м",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='menu')]])
-            )
-        else:
-            balances[user_id] = balance + DAILY_BONUS
-            save_json(BALANCE_FILE, balances)
-            daily_data[user_id] = current_time
-            save_json(DAILY_BONUS_FILE, daily_data)
-            await query.edit_message_text(
-                f"🎁 Бонус! +{DAILY_BONUS} PAK\n💰 Новый баланс: {balances[user_id]:.0f} PAK",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data='menu')]])
-            )
+        text = f"🎁 Вы получили {DAILY_BONUS} PAK! 🎉\n\n💰 Баланс: {balances[user_id]} PAK"
+    else:
+        hours_left = 24 - (current_time - last_claim) / 3600
+        text = f"⏰ Бонус уже получен! Следующий через {int(hours_left)} часов."
     
-    elif query.data == 'top':
-        await top_players(update, context)
-    
-    elif query.data == 'menu':
-        await query.edit_message_text("Главное меню:", reply_markup=get_main_menu())
+    if query:
+        await query.edit_message_text(text, parse_mode='Markdown', reply_markup=get_main_menu())
+    else:
+        await update.message.reply_text(text, parse_mode='Markdown', reply_markup=get_main_menu())
 
-# ========== ОБРАБОТЧИК СООБЩЕНИЙ ==========
+# ========== ТОП ИГРОКОВ ==========
+async def show_top(update: Update, context: ContextTypes.DEFAULT_TYPE, query=None):
+    balances = load_json(BALANCE_FILE)
+    top_players = sorted(balances.items(), key=lambda x: x[1], reverse=True)[:10]
+    
+    text = "🏆 **Топ 10 игроков:**\n\n"
+    for i, (user_id, balance) in enumerate(top_players, 1):
+        text += f"{i}. ID: {user_id} - {balance} PAK\n"
+    
+    if query:
+        await query.edit_message_text(text, parse_mode='Markdown', reply_markup=get_main_menu())
+    else:
+        await update.message.reply_text(text, parse_mode='Markdown', reply_markup=get_main_menu())
+
+# ========== ИГРА В КУБИК ==========
+async def dice_game(update: Update, context: ContextTypes.DEFAULT_TYPE, query=None):
+    await query.edit_message_text(
+        "🎲 Игра 'Кубик'\n\n"
+        "Введите сумму ставки (в PAK) и выберите чет/нечет\n"
+        "Пример: 100 чет\n"
+        "Пример: 50 нечет",
+        reply_markup=get_games_menu()
+    )
+    context.user_data['game'] = 'dice'
+
+# ========== ИГРА В МНОЖИТЕЛЬ ==========
+async def multiplier_game(update: Update, context: ContextTypes.DEFAULT_TYPE, query=None):
+    await query.edit_message_text(
+        "🎰 Игра 'Множитель'\n\n"
+        "Введите сумму ставки и число от 1 до 8\n"
+        "Пример: 100 5",
+        reply_markup=get_games_menu()
+    )
+    context.user_data['game'] = 'multiplier'
+
+# ========== РУЛЕТКА ==========
+async def roulette_game(update: Update, context: ContextTypes.DEFAULT_TYPE, query=None):
+    await query.edit_message_text(
+        "🎡 Игра 'Рулетка'\n\n"
+        "Введите сумму ставки и число от 1 до 36\n"
+        "Пример: 100 17",
+        reply_markup=get_games_menu()
+    )
+    context.user_data['game'] = 'roulette'
+
+# ========== СЛОТЫ ==========
+async def slots_game(update: Update, context: ContextTypes.DEFAULT_TYPE, query=None):
+    await query.edit_message_text(
+        "🎰 Игра 'Слоты'\n\n"
+        "Введите сумму ставки\n"
+        "Пример: 100",
+        reply_markup=get_games_menu()
+    )
+    context.user_data['game'] = 'slots'
+
+# ========== КАМЕНЬ-НОЖНИЦЫ-БУМАГА ==========
+async def rps_game(update: Update, context: ContextTypes.DEFAULT_TYPE, query=None):
+    await query.edit_message_text(
+        "✊ Камень-Ножницы-Бумага\n\n"
+        "Введите сумму ставки и ваш выбор:\n"
+        "камень, ножницы или бумага\n"
+        "Пример: 100 камень",
+        reply_markup=get_games_menu()
+    )
+    context.user_data['game'] = 'rps'
+
+# ========== БЛЭКДЖЕК ==========
+async def blackjack_game(update: Update, context: ContextTypes.DEFAULT_TYPE, query=None):
+    await query.edit_message_text(
+        "🃏 Блэкджек\n\n"
+        "Введите сумму ставки\n"
+        "Пример: 100",
+        reply_markup=get_games_menu()
+    )
+    context.user_data['game'] = 'blackjack'
+
+# ========== КОСТИ (СУММА) ==========
+async def dice_sum_game(update: Update, context: ContextTypes.DEFAULT_TYPE, query=None):
+    await query.edit_message_text(
+        "🎲 Игра 'Кости'\n\n"
+        "Введите сумму ставки и предсказание (7-12)\n"
+        "Пример: 100 7",
+        reply_markup=get_games_menu()
+    )
+    context.user_data['game'] = 'dice_sum'
+
+# ========== ОБРАБОТЧИК СООБЩЕНИЙ ДЛЯ СТАВОК ==========
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.lower().strip()
-    
-    if text.startswith('/'):
+    if 'game' not in context.user_data:
         return
     
-    # КУБИК
-    if text.startswith("чет") or text.startswith("чёт"):
-        parts = text.split()
-        if len(parts) > 1:
-            try:
-                bet = int(parts[1])
-                await play_dice_game(update, bet, "even")
-            except:
-                pass
-        return
+    user_id = str(update.effective_user.id)
+    balances = load_json(BALANCE_FILE)
+    balance = balances.get(user_id, 0)
     
-    elif text.startswith("нечет") or text.startswith("нечёт"):
-        parts = text.split()
-        if len(parts) > 1:
-            try:
-                bet = int(parts[1])
-                await play_dice_game(update, bet, "odd")
-            except:
-                pass
-        return
-    
-    # МНОЖИТЕЛЬ
-    elif text.startswith("множитель"):
-        parts = text.split()
-        if len(parts) > 2:
-            try:
-                bet = int(parts[1])
-                number = int(parts[2])
-                if 1 <= number <= 8:
-                    await play_multiplier_game(update, bet, number)
-            except:
-                pass
-        return
-    
-    # РУЛЕТКА
-    elif text.startswith("рулетка"):
-        parts = text.split()
-        if len(parts) > 2:
-            try:
-                bet = int(parts[1])
-                choice = parts[2]
-                if choice.isdigit() and 0 <= int(choice) <= 36:
-                    await play_roulette_game(update, bet, int(choice))
-                elif choice in ["red", "black", "even", "odd"]:
-                    await play_roulette_game(update, bet, choice)
-            except:
-                pass
-        return
-    
-    # СЛОТЫ
-    elif text.startswith("слоты"):
-        parts = text.split()
-        if len(parts) > 1:
-            try:
-                bet = int(parts[1])
-                await play_slots_game(update, bet)
-            except:
-                pass
-        return
-    
-    # КНБ
-    elif text.startswith("кнб"):
-        parts = text.split()
-        if len(parts) > 2:
-            try:
-                bet = int(parts[1])
-                choice = parts[2]
-                if choice in ["камень", "ножницы", "бумага"]:
-                    await play_rps_game(update, bet, choice)
-            except:
-                pass
-        return
-    
-    # БЛЭКДЖЕК
-    elif text.startswith("блэкджек"):
-        parts = text.split()
-        if len(parts) > 1:
-            try:
-                bet = int(parts[1])
-                await play_blackjack_game(update, bet)
-            except:
-                pass
-        return
-    
-    # КОСТИ
-    elif text.startswith("кости"):
-        parts = text.split()
-        if len(parts) > 2:
-            try:
-                bet = int(parts[1])
-                target = int(parts[2])
-                if 7 <= target <= 12:
-                    await play_dice_sum_game(update, bet, target)
-            except:
-                pass
-        return
+    try:
+        parts = update.message.text.split()
+        game = context.user_data['game']
+        
+        if game == 'dice':
+            bet = int(parts[0])
+            choice = parts[1].lower()
+            
+            if bet > balance:
+                await update.message.reply_text("❌ Недостаточно средств!")
+                return
+            
+            dice = random.randint(1, 6)
+            result = "чет" if dice % 2 == 0 else "нечет"
+            win = (choice == result)
+            
+            if win:
+                win_amount = int(bet * 1.8)
+                balances[user_id] += win_amount
+                text = f"🎲 Выпало: {dice} ({result})\n✅ Вы выиграли! +{win_amount} PAK"
+            else:
+                balances[user_id] -= bet
+                text = f"🎲 Выпало: {dice} ({result})\n❌ Вы проиграли! -{bet} PAK"
+            
+            save_json(BALANCE_FILE, balances)
+            await update.message.reply_text(f"{text}\n💰 Новый баланс: {balances[user_id]} PAK")
+        
+        elif game == 'slots':
+            bet = int(parts[0])
+            
+            if bet > balance:
+                await update.message.reply_text("❌ Недостаточно средств!")
+                return
+            
+            slots = [random.randint(1, 7) for _ in range(3)]
+            if slots[0] == slots[1] == slots[2]:
+                win_amount = bet * 10
+                balances[user_id] += win_amount
+                text = f"🎰 [{slots[0]}] [{slots[1]}] [{slots[2]}]\n🎉 ДЖЕКПОТ! Вы выиграли {win_amount} PAK!"
+            elif slots[0] == slots[1] or slots[1] == slots[2] or slots[0] == slots[2]:
+                win_amount = bet * 2
+                balances[user_id] += win_amount
+                text = f"🎰 [{slots[0]}] [{slots[1]}] [{slots[2]}]\n✅ Вы выиграли! +{win_amount} PAK"
+            else:
+                balances[user_id] -= bet
+                text = f"🎰 [{slots[0]}] [{slots[1]}] [{slots[2]}]\n❌ Вы проиграли! -{bet} PAK"
+            
+            save_json(BALANCE_FILE, balances)
+            await update.message.reply_text(f"{text}\n💰 Новый баланс: {balances[user_id]} PAK")
+        
+        # Добавьте остальные игры по аналогии
+        
+        del context.user_data['game']
+        
+    except (ValueError, IndexError):
+        await update.message.reply_text("❌ Неправильный формат! Пожалуйста, следуйте инструкции.")
 
-# ========= ЗАПУСК =========
-
+# ========== ГЛАВНАЯ ФУНКЦИЯ ==========
 def main():
-    TOKEN = "8593186262:AAGN6sTyBa1Rl"
+    token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    
+    if not token:
+        print("Ошибка: TELEGRAM_BOT_TOKEN не установлен")
+        return
+    
+    app = Application.builder().token(token).build()
+    
+    # Добавляем обработчики
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(button_callback))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    
+    # Запускаем бота
+    print("Бот запущен...")
+    app.run_polling()
 
-    application = Application.builder().token(TOKEN).build()
-
-    # Нужно создать экземпляры хендлеров с командами
-    application.add_handler(CommandHandler("start", start_command))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("balance", balance_command))
-    # Или так, если у вас есть список
-    application.add_handlers([
-        CommandHandler("start", start_command),
-        CommandHandler("help", help_command),
-        CommandHandler("balance", balance_command),
-    ])
-
-    print("РАК ВОТ запущен!")
-    print("7 игр доступно!")
-    print("1 ₽ = 10 РАК")
-    application.run_polling()
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
