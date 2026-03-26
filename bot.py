@@ -622,7 +622,7 @@ async def farm_upgrade(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"💰 Потрачено: {cost} PAK\n"
             f"📊 Новый уровень: {new_level}\n"
             f"⚡ Новая добыча: {new_rate} PAK/час\n"
-            f"💎 Остаток PAK: {user_data[2]}"
+            f"💎 Остаток PAK: {user_data[2]:.2f}"
         )
     else:
         user_data = db.get_user(user_id)
@@ -641,8 +641,8 @@ async def farm_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = f"""🌾 СТАТИСТИКА ФЕРМЫ:
 
 📊 Уровень: {user_data[6]}
-⚡ Добыча/час: {user_data[7]} PAK
-🏆 Всего добыто: {user_data[8]} PAK
+⚡ Добыча/час: {user_data[7]:.2f} PAK
+🏆 Всего добыто: {user_data[8]:.2f} PAK
 
 💰 Следующее улучшение:
 Стоимость: {next_cost} PAK
@@ -866,7 +866,7 @@ async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
     for i, user in enumerate(top_users):
         username, pak, rub, wealth = user
-        text += f"{medals[i]} {username}: 💎{pak} PAK | 💵{rub} РУБ | 💰{wealth:.0f} PAK\n"
+        text += f"{medals[i]} {username}: 💎{pak:.2f} PAK | 💵{rub} РУБ | 💰{wealth:.2f} PAK\n"
     await update.message.reply_text(text)
 
 # GIVE (АДМИН)
