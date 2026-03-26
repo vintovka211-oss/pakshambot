@@ -1213,51 +1213,7 @@ elif data.startswith("confirm_"):
 
 elif data == "cancel_buy":
     await query.edit_message_text("❌ Покупка отменена")
-    
-    # ========== ПОКУПКА ЗА ЗВЕЗДЫ ==========
-    elif data.startswith("buy_pak_"):
-        stars = int(data.replace("buy_pak_", ""))
-        if stars == 1:
-            await process_star_purchase(update, context, 1, 4, 0)
-        elif stars == 5:
-            await process_star_purchase(update, context, 5, 20, 0)
-        elif stars == 10:
-            await process_star_purchase(update, context, 10, 45, 0)
-        elif stars == 50:
-            await process_star_purchase(update, context, 50, 250, 0)
-    
-    elif data.startswith("buy_rub_"):
-        stars = int(data.replace("buy_rub_", ""))
-        if stars == 1:
-            await process_star_purchase(update, context, 1, 0, 1)
-        elif stars == 5:
-            await process_star_purchase(update, context, 5, 0, 5)
-        elif stars == 10:
-            await process_star_purchase(update, context, 10, 0, 11)
-        elif stars == 50:
-            await process_star_purchase(update, context, 50, 0, 60)
-    
-    elif data.startswith("confirm_stars_"):
-        parts = data.split("_")
-        stars = int(parts[2])
-        pak = int(parts[3])
-        rub = int(parts[4])
-        await confirm_star_purchase(update, context, stars, pak, rub)
-    
-    elif data == "cancel_purchase":
-        await query.edit_message_text("❌ Покупка отменена")
-    
-    # ========== ВЫВОД СРЕДСТВ ==========
-elif data == "withdraw_notify":
-    await query.edit_message_text(
-        "🔔 Вы будете уведомлены, когда вывод средств станет доступен!\n\n"
-        "Спасибо за интерес к нашему боту! 🚀"
-    )
-elif data == "withdraw_back":
-    await query.edit_message_text("🔙 Возврат в главное меню")
-    # Показываем главное меню
-    await start(update, context)
-
+        
 # ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ КЛАНОВ ====================
 async def clan_create_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
