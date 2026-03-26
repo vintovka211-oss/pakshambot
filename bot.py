@@ -847,18 +847,65 @@ async def clan_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text += f"{medals[i]} {name}\n   👥 {members} участников\n   💎 {total_pak} PAK | 💵 {total_rub} РУБ\n   💰 Общая ценность: {total_wealth:.0f} PAK\n   ➖➖➖➖➖➖➖\n"
     await update.message.reply_text(text)
 
-# ПОКУПКА И ВЫВОД
+# ==================== ПОКУПКА ЗА ЗВЕЗДЫ ====================
 async def buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
-        [InlineKeyboardButton("⭐ 2 рубля → 1 звезда", callback_data="buy_rub_for_stars")],
-        [InlineKeyboardButton("💎 Купить PAK за звезды", callback_data="buy_pak_menu")],
-        [InlineKeyboardButton("💵 Купить РУБ за звезды", callback_data="buy_rub_menu")],
+        [InlineKeyboardButton("⭐ 1 звезда → 4 PAK", callback_data="buy_pak_1")],
+        [InlineKeyboardButton("⭐ 5 звезд → 20 PAK (+бонус)", callback_data="buy_pak_5")],
+        [InlineKeyboardButton("⭐ 10 звезд → 45 PAK (+5 бонус)", callback_data="buy_pak_10")],
+        [InlineKeyboardButton("⭐ 50 звезд → 250 PAK (+50 бонус)", callback_data="buy_pak_50")],
+        [InlineKeyboardButton("💎 1 звезда → 1 РУБ", callback_data="buy_rub_1")],
+        [InlineKeyboardButton("💎 5 звезд → 5 РУБ", callback_data="buy_rub_5")],
+        [InlineKeyboardButton("💎 10 звезд → 11 РУБ (+1 бонус)", callback_data="buy_rub_10")],
+        [InlineKeyboardButton("💎 50 звезд → 60 РУБ (+10 бонус)", callback_data="buy_rub_50")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("⭐ ПОКУПКА ЗА ЗВЕЗДЫ ⭐\n\nКурс: 2 ₽ = 1 ⭐\n4 PAK = 1 ₽\n\nВыбери действие:", reply_markup=reply_markup)
+    await update.message.reply_text(
+        "⭐ ПОКУПКА ЗА ЗВЕЗДЫ ⭐\n\n"
+        "Курс: 1 ⭐ = 4 PAK\n"
+        "1 ⭐ = 1 РУБ\n\n"
+        "Выбери вариант покупки:",
+        reply_markup=reply_markup
+    )
 
-async def withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("💸 ВЫВОД СРЕДСТВ 💸\n\n⚙️ Функция вывода средств находится в разработке!\n\nСкоро вы сможете выводить средства!\nСледите за обновлениями! 🔜")
+async def process_star_purchase(update: Update, context: ContextTypes.DEFAULT_TYPE, stars: int, pak: int, rub: int):
+    """Обработка покупки за звезды"""
+    user_id = update.effective_user.id
+    user_data = db.get_user(user_id)
+    
+    # Здесь в будущем будет реальная интеграция с Telegram Stars API
+    # Пока используем подтверждение
+    keyboard = [
+        [InlineKeyboardButton("✅ Подтвердить покупку", callback_data=f"confirm_stars_{stars}_{pak}_{rub}")],
+        [InlineKeyboardButton("❌ Отмена", callback_data="cancel_purchase")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.callback_query.edit_message_text(
+        f"⭐ ПОДТВЕРЖДЕНИЕ ПОКУПКИ ⭐\n\n"
+        f"Тратится звезд: {stars} ⭐\n"
+        f"Вы получаете:\n"
+        f"💰 +{pak} PAK\n"
+        f"💵 +{rub} РУБ\n\n"
+        f"Подтвердите покупку:",
+        reply_markup=reply_markup
+    )
+
+async def confirm_star_purchase(update: Update, context: ContextTypes.DEFAULT_TYPE, stars: int, pak: int, rub: int):
+    """Подтверждение покупки за звезды"""
+    user_id = update.effective_user.id
+    
+    # Начисляем валюту
+    db.update_balance(user_id, pak, rub)
+    
+    user_data = db.get_user(user_id)
+    
+    await update.callback_query.edit_message_text(
+        f"✅ ПОКУПКА УСПЕШНО ЗАВЕРШЕНА! ✅\n\n"
+        f"⭐ Потрачено звезд: {stars}\n"
+        f"💰 Получено: +{pak} PAK, +{rub} РУБ\n\n"
+        f"💎 Новый баланс: {user_data[2]:.2f} PAK, {user_data[3]} РУБ"
+    )
 
 # ТОП ИГРОКОВ
 async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
