@@ -695,39 +695,28 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 pass
         return
 
-# ========== ЗАПУСК ==========
+# ========= ЗАПУСК =========
+
 def main():
-    TOKEN = "8593186262:AAGN6sTyBa1RlJ0eVWwNVzgYUb6aVy_H9LA"
-    
+    TOKEN = "8593186262:AAGN6sTyBa1Rl"
+
     application = Application.builder().token(TOKEN).build()
-    
-    application.add_handler(CommandHandler("start", start))
+
+    # Нужно создать экземпляры хендлеров с командами
+    application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("balance", balance_command))
-    application.add_handler(CommandHandler("bonus", daily_bonus))
-    application.add_handler(CommandHandler("give", secret_give_command))
-    application.add_handler(CallbackQueryHandler(button_handler))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    
-    print("🤖 PAK BOT запущен!")
-    print("✅ 7 игр доступно!")
-    print("✅ 1 ₽ = 10 PAK")
+    # Или так, если у вас есть список
+    application.add_handlers([
+        CommandHandler("start", start_command),
+        CommandHandler("help", help_command),
+        CommandHandler("balance", balance_command),
+    ])
+
+    print("РАК ВОТ запущен!")
+    print("7 игр доступно!")
+    print("1 ₽ = 10 РАК")
     application.run_polling()
 
 if __name__ == '__main__':
     main()
-```
-
----
-
-Как играть:
-
-Игра Команда
-Кубик чет 100 или нечет 100
-Множитель множитель 100 5
-Рулетка рулетка 100 7 или рулетка 100 red
-Слоты слоты 100
-КНБ кнб 100 камень
-Блэкджек блэкджек 100
-Кости кости 100 7
-
----
