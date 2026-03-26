@@ -4,7 +4,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ContextTypes
 from config import TOKEN, ADMIN_ID, MSG_REWARD
 from database import Database
-from games import CasinoGames
+from casino_games import CasinoGames  # Импортируем новые игры
 
 # Настройка логирования
 logging.basicConfig(
@@ -19,6 +19,9 @@ db = Database()
 # Функция проверки админа
 def is_admin(user_id):
     return user_id == ADMIN_ID
+
+# Хранилище для ставок
+user_bets = {}
 
 # Команда /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -78,13 +81,80 @@ async def buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Команда /casino
 async def casino(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
-        [InlineKeyboardButton("🎲 Кости", callback_data="game_dice")],
-        [InlineKeyboardButton("🃏 Блэкджек", callback_data="game_blackjack")],
-        [InlineKeyboardButton("🎰 Слоты", callback_data="game_slots")],
-        [InlineKeyboardButton("💀 High Risk", callback_data="game_highrisk")],
+        [InlineKeyboardButton("🎲 Кости (x1.1-1.5)", callback_data="game_dice")],
+        [InlineKeyboardButton("🃏 Блэкджек (x1.1-1.4)", callback_data="game_blackjack")],
+        [InlineKeyboardButton("🎰 Слоты (x1.3-5)", callback_data="game_slots")],
+        [InlineKeyboardButton("💀 High Risk (x2-5)", callback_data="game_highrisk")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("🎮 Выбери игру:", reply_markup=reply_markup)
+    await update.message.reply_text("🎮 Выбери игру и введи ставку в формате: PAK РУБ\nПример: 100 50", reply_markup=reply_markup)
+    context.user_data['waiting_for_bet'] = True
+
+# Обработка ставки для казино
+async def handle_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.user_data.get('waiting_for_bet'):
+        return
+    
+    user_id = update.effective_user.id
+    text = update.message.text.split()
+    
+    if len(text) != 2:
+        await update.message.reply_text("❌ Неверный формат! Введите: PAK РУБ\nПример: 100 50")
+        return
+    
+    try:
+        bet_pak = int(text[0])
+        bet_rub = int(text[1])
+    except ValueError:
+        await update.message.reply_text("❌ Ставки должны быть числами!")
+        return
+    
+    # Проверяем баланс
+    user_data = db.get_user(user_id)
+    if user_data[2] < bet_pak or user_data[3] < bet_rub:
+        await update.message.reply_text("❌ Недостаточно средств!")
+        context.user_data['waiting_for_bet'] = False
+        return
+    
+    if bet_pak <= 0 or bet_rub < 0:
+        await update.message.reply_text("❌ Ставка должна быть положительной!")
+        context.user_data['waiting_for_bet'] = False
+        return
+    
+    # Сохраняем ставку
+    game = context.user_data.get('selected_game', 'dice')
+    context.user_data['bet_pak'] = bet_pak
+    context.user_data['bet_rub'] = bet_rub
+    
+    # Запускаем игру
+    if game == 'dice':
+        win, change_pak, change_rub, result_text = await CasinoGames.roll_dice(update, context, bet_pak, bet_rub)
+    elif game == 'blackjack':
+        win, change_pak, change_rub, result_text = await CasinoGames.blackjack(update, context, bet_pak, bet_rub)
+    elif game == 'slots':
+        win, change_pak, change_rub, result_text = await CasinoGames.slot_machine(update, context, bet_pak, bet_rub)
+    elif game == 'highrisk':
+        win, change_pak, change_rub, result_text = await CasinoGames.high_risk(update, context, bet_pak, bet_rub)
+    else:
+        await update.message.reply_text("❌ Игра не найдена!")
+        context.user_data['waiting_for_bet'] = False
+        return
+    
+    # Обновляем баланс
+    if win is True:
+        db.update_balance(user_id, change_pak, change_rub)
+    elif win is False:
+        db.update_balance(user_id, -change_pak, -change_rub)
+    else:  # Ничья
+        db.update_balance(user_id, 0, 0)
+    
+    await update.message.reply_text(result_text)
+    
+    # Показываем новый баланс
+    new_balance = db.get_user(user_id)
+    await update.message.reply_text(f"💰 Новый баланс: {new_balance[2]} PAK, {new_balance[3]} РУБ")
+    
+    context.user_data['waiting_for_bet'] = False
 
 # Команда /duel
 async def duel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -131,14 +201,25 @@ async def clan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("👥 Управление кланами:", reply_markup=reply_markup)
 
-# Команда /give (только для админа)
+# Команда /give (ИСПРАВЛЕНА - РАБОТАЕТ!)
 async def give(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_admin(update.effective_user.id):
-        await update.message.reply_text("❌ Недостаточно прав!")
+    user_id = update.effective_user.id
+    
+    # Проверка админа
+    if not is_admin(user_id):
+        await update.message.reply_text("❌ Недостаточно прав! Команда доступна только администратору.")
         return
     
+    # Если нет аргументов - выдаем себе для тестирования
+    if len(context.args) == 0:
+        db.update_balance(user_id, 10000, 1000)
+        user_data = db.get_user(user_id)
+        await update.message.reply_text(f"✅ Выдано себе: 10000 PAK и 1000 РУБ\n💰 Новый баланс: {user_data[2]} PAK, {user_data[3]} РУБ")
+        return
+    
+    # Если есть аргументы - выдаем другому пользователю
     if len(context.args) < 3:
-        await update.message.reply_text("❌ Использование: /give @username PAK РУБ")
+        await update.message.reply_text("❌ Использование:\n/give - выдать себе 10000 PAK и 1000 РУБ\n/give @username PAK РУБ - выдать пользователю")
         return
     
     username = context.args[0].replace('@', '')
@@ -149,10 +230,27 @@ async def give(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Суммы должны быть числами!")
         return
     
-    await update.message.reply_text(f"✅ Выдано {pak} PAK и {rub} РУБ пользователю @{username}")
+    # Ищем пользователя в базе по username
+    conn = db.conn
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id, username FROM users WHERE username = ?", (username,))
+    result = cursor.fetchone()
+    
+    if result:
+        target_id = result[0]
+        db.update_balance(target_id, pak, rub)
+        target_data = db.get_user(target_id)
+        await update.message.reply_text(f"✅ Выдано {pak} PAK и {rub} РУБ пользователю @{username}\n💰 Новый баланс: {target_data[2]} PAK, {target_data[3]} РУБ")
+    else:
+        await update.message.reply_text(f"❌ Пользователь @{username} не найден в базе! Убедитесь, что он написал /start боту.")
 
 # Обработка сообщений
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Проверяем, ждем ли ставку
+    if context.user_data.get('waiting_for_bet'):
+        await handle_bet(update, context)
+        return
+    
     # Проверяем, что это не команда
     if update.message.text and update.message.text.startswith('/'):
         return
@@ -175,10 +273,15 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
-    if query.data.startswith("buy_"):
+    if query.data.startswith("game_"):
+        game = query.data.replace("game_", "")
+        context.user_data['selected_game'] = game
+        await query.edit_message_text(f"🎮 Выбрана игра: {game}\n💰 Введите ставку в формате: PAK РУБ\nПример: 100 50")
+        context.user_data['waiting_for_bet'] = True
+        
+    elif query.data.startswith("buy_"):
         await query.edit_message_text("🛒 Покупка через Telegram Stars. Функция в разработке!")
-    elif query.data.startswith("game_"):
-        await query.edit_message_text("🎮 Игра в разработке! Скоро появится.")
+        
     elif query.data == "clan_list":
         clans = db.get_all_clans()
         if clans:
@@ -188,8 +291,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(text)
         else:
             await query.edit_message_text("❌ Нет доступных кланов")
+            
     elif query.data == "clan_create":
         await query.edit_message_text("🏰 Функция создания клана в разработке!")
+        
     elif query.data == "clan_my":
         user_id = query.from_user.id
         user_data = db.get_user(user_id)
@@ -200,7 +305,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await query.edit_message_text("🛒 Функция в разработке!")
 
-# ГЛАВНАЯ ФУНКЦИЯ - ИСПРАВЛЕНА
+# ГЛАВНАЯ ФУНКЦИЯ
 async def main():
     """Запуск бота"""
     print("🚀 Запуск бота W1nPAK...")
