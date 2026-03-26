@@ -1180,6 +1180,39 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         clan_id = int(parts[3])
         user_id = int(parts[4])
         await clan_kick_user(update, context, clan_id, user_id)
+
+    # ========== ПОКУПКИ ==========
+elif data.startswith("buy_pak_"):
+    stars = int(data.replace("buy_pak_", ""))
+    if stars == 1:
+        await process_star_purchase(update, context, 1, 4, 0)
+    elif stars == 5:
+        await process_star_purchase(update, context, 5, 20, 0)
+    elif stars == 10:
+        await process_star_purchase(update, context, 10, 45, 0)
+    elif stars == 50:
+        await process_star_purchase(update, context, 50, 250, 0)
+
+elif data.startswith("buy_rub_"):
+    stars = int(data.replace("buy_rub_", ""))
+    if stars == 1:
+        await process_star_purchase(update, context, 1, 0, 1)
+    elif stars == 5:
+        await process_star_purchase(update, context, 5, 0, 5)
+    elif stars == 10:
+        await process_star_purchase(update, context, 10, 0, 11)
+    elif stars == 50:
+        await process_star_purchase(update, context, 50, 0, 60)
+
+elif data.startswith("confirm_"):
+    parts = data.split("_")
+    stars = int(parts[1])
+    pak = int(parts[2])
+    rub = int(parts[3])
+    await confirm_buy(update, context, stars, pak, rub)
+
+elif data == "cancel_buy":
+    await query.edit_message_text("❌ Покупка отменена")
     
     # ========== ПОКУПКА ЗА ЗВЕЗДЫ ==========
     elif data.startswith("buy_pak_"):
@@ -1420,6 +1453,23 @@ async def main():
     print("🤖 Бот начал polling...")
     await asyncio.Event().wait()
 
+async def process_star_purchase(update, context, stars, pak, rub):
+    keyboard = [
+        [InlineKeyboardButton("✅ Подтвердить", callback_data=f"confirm_{stars}_{pak}_{rub}")],
+        [InlineKeyboardButton("❌ Отмена", callback_data="cancel_buy")],
+    ]
+    await update.callback_query.edit_message_text(
+        f"⭐ Покупка {stars} звезд\nПолучите: +{pak} PAK, +{rub} РУБ\n\nПодтвердите?",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+async def confirm_buy(update, context, stars, pak, rub):
+    user_id = update.effective_user.id
+    db.update_balance(user_id, pak, rub)
+    user_data = db.get_user(user_id)
+    await update.callback_query.edit_message_text(
+        f"✅ Куплено! +{pak} PAK, +{rub} РУБ\n💰 Баланс: {user_data[2]:.2f} PAK"
+    )
+
 if __name__ == '__main__':
     asyncio.run(main())
-            
