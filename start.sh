@@ -1,1 +1,3 @@
-python reset.py && python bot.py
+#!/bin/bash
+pip install -r requirements.txt
+python bot.py
