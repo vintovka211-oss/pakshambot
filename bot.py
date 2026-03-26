@@ -893,27 +893,26 @@ async def give(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ОБРАБОТЧИК СООБЩЕНИЙ
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Обработка создания клана
     if context.user_data.get('creating_clan') == 'waiting_name':
         await clan_create_name(update, context)
         return
     elif context.user_data.get('creating_clan') == 'waiting_description':
         await clan_create_description(update, context)
         return
+    
+    # Обработка ставки в казино
     if context.user_data.get('waiting_for_bet'):
         await handle_bet(update, context)
         return
+    
+    # Игнорируем команды
     if update.message.text and update.message.text.startswith('/'):
         return
-    user_id = update.effective_user.id
-    user = update.effective_user
-    db.register_user(user_id, user.username or str(user_id))
-    if db.can_get_message_reward(user_id):
-        if db.can_get_message_reward(user_id):
-    if user.bio and "W1npakshambot" in user.bio:
-        db.update_balance(user_id, MSG_REWARD, 0)
-        db.update_message_time(user_id)
-        # Показываем с двумя знаками после запятой
-        await update.message.reply_text(f"💎 +{MSG_REWARD:.2f} PAK за сообщение!")
+    
+    # НАГРАДА ЗА СООБЩЕНИЯ УБРАНА
+    # Просто игнорируем обычные сообщения
+    pass
 
 # ОБРАБОТЧИК CALLBACK
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
