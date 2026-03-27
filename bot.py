@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-W1NPAKSHAM BOT - Полноценный бот со всеми функциями
-Оптимизирован для Render с Python 3.11
+W1NPAKSHAM BOT - Полноценный бот для Render
 """
 
 import asyncio
@@ -10,7 +9,6 @@ import os
 import sys
 import shutil
 from datetime import datetime
-from aiohttp import web
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
@@ -54,7 +52,7 @@ dp.message.register(handle_bet, GameStates.waiting_bet)
 dp.message.register(handle_donate_amount, DonateStates.waiting_amount)
 dp.message.register(handle_withdraw_amount, WithdrawStates.waiting_amount)
 
-# ==================== KEEP-ALIVE ====================
+# ==================== KEEP-ALIVE (без aiohttp) ====================
 async def keep_alive():
     """Пинг чтобы сервер не засыпал"""
     while True:
@@ -79,47 +77,46 @@ async def backup_database():
                 # Удаляем старые бэкапы (оставляем последние 24)
                 backups = sorted([f for f in os.listdir() if f.startswith("backup_")])
                 for old in backups[:-24]:
-                    os.remove(old)
+                    try:
+                        os.remove(old)
+                    except:
+                        pass
         except Exception as e:
             logger.error(f"❌ Бэкап ошибка: {e}")
 
-# ==================== HEALTH CHECK ====================
-async def health_check(request):
-    """Проверка работоспособности"""
-    try:
-        # Проверяем БД
-        from database import get_user
-        await get_user(1)
-        return web.json_response({
-            "status": "ok",
-            "time": datetime.now().isoformat(),
-            "bot": "W1NPAKSHAM"
-        })
-    except Exception as e:
-        return web.json_response({"status": "error", "error": str(e)}, status=500)
-
-# ==================== СТАТИСТИКА ДЛЯ МОНИТОРИНГА ====================
-async def stats_check(request):
-    """Статистика для мониторинга"""
-    try:
-        from database import get_user
-        import aiosqlite
-        
-        async with aiosqlite.connect("w1npaksham.db") as db:
-            async with db.execute("SELECT COUNT(*) FROM users") as cursor:
-                users = (await cursor.fetchone())[0]
-            
-            async with db.execute("SELECT COUNT(*) FROM users WHERE is_premium = 1") as cursor:
-                premium = (await cursor.fetchone())[0]
-        
-        return web.json_response({
-            "status": "ok",
-            "users": users,
-            "premium": premium,
-            "time": datetime.now().isoformat()
-        })
-    except Exception as e:
-        return web.json_response({"status": "error", "error": str(e)}, status=500)
+# ==================== ПРОСТОЙ HTTP СЕРВЕР ДЛЯ RENDER ====================
+async def run_http_server():
+    """Простой HTTP сервер для health check (без aiohttp)"""
+    import socket
+    
+    async def handle_client(reader, writer):
+        """Обработка запроса"""
+        try:
+            await reader.readline()
+            response = (
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: text/plain\r\n"
+                "Content-Length: 2\r\n"
+                "Connection: close\r\n\r\n"
+                "OK"
+            )
+            writer.write(response.encode())
+            await writer.drain()
+        except Exception as e:
+            logger.error(f"HTTP ошибка: {e}")
+        finally:
+            writer.close()
+            await writer.wait_closed()
+    
+    server = await asyncio.start_server(
+        handle_client,
+        "0.0.0.0",
+        PORT,
+        reuse_port=True
+    )
+    
+    logger.info(f"✅ HTTP сервер запущен на порту {PORT}")
+    await server.serve_forever()
 
 # ==================== ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ОШИБОК ====================
 @dp.errors()
@@ -155,19 +152,8 @@ async def main():
     # Запускаем фоновые задачи
     asyncio.create_task(keep_alive())
     asyncio.create_task(backup_database())
+    asyncio.create_task(run_http_server())
     print("✅ Фоновые задачи запущены")
-    
-    # Запускаем веб-сервер для Render
-    app = web.Application()
-    app.router.add_get("/", health_check)
-    app.router.add_get("/health", health_check)
-    app.router.add_get("/stats", stats_check)
-    
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", PORT)
-    await site.start()
-    print(f"✅ Веб-сервер на порту {PORT}")
     
     print("=" * 50)
     print(f"🎮 БОТ ГОТОВ К РАБОТЕ!")
