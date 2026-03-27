@@ -384,15 +384,74 @@ async def confirm_deposit(message: types.Message):
     success, result = await approve_deposit(request_id)
     await message.answer(result)
 
-# ==================== ВЫВОД ====================
-async def handle_withdraw_amount(message: types.Message, state: FSMContext):
-    """Сумма вывода"""
+# ==================== ДОНАТ И ВЫВОД ====================
+
+async def handle_donate_amount(message: types.Message, state: FSMContext):
+    """Обработка суммы доната"""
     try:
         amount = int(message.text)
     except ValueError:
         await message.answer("❌ Введите число!")
         return
     
+    if amount < MIN_DONATION or amount > MAX_DONATION:
+        await message.answer(f"❌ Сумма от {MIN_DONATION} до {MAX_DONATION} {CURRENCY}!")
+        return
+    
+    await state.update_data(amount=amount)
+    await message.answer("Выберите способ оплаты:", reply_markup=get_payment_keyboard())
+    await state.set_state(DonateStates.waiting_method)
+
+
+async def handle_donate_method(callback: types.CallbackQuery, state: FSMContext):
+    """Обработка способа оплаты"""
+    method = callback.data.split("_")[2]
+    data = await state.get_data()
+    amount = data.get("amount")
+    
+    from database import create_deposit_request
+    success, request_id, amount_pac = await create_deposit_request(callback.from_user.id, amount, method)
+    
+    if not success:
+        await callback.answer("❌ Ошибка!")
+        return
+    
+    wallet = YOUR_WALLETS.get(method, "Уточните у администратора")
+    
+    text = (
+        f"💎 **Заявка #{request_id}**\n\n"
+        f"💰 {amount}{CURRENCY} → {amount_pac} {COIN_NAME}\n"
+        f"💳 {PAYMENT_METHODS[method]}\n\n"
+        f"💳 **Реквизиты:**\n`{wallet}`\n\n"
+        f"После оплаты отправьте /confirm_{request_id}"
+    )
+    
+    await callback.message.edit_text(text, parse_mode="Markdown")
+    await state.clear()
+
+
+async def confirm_deposit(message: types.Message):
+    """Подтверждение оплаты"""
+    try:
+        request_id = int(message.text.split("_")[1])
+    except:
+        await message.answer("❌ Используйте: /confirm_123")
+        return
+    
+    from database import approve_deposit
+    success, result = await approve_deposit(request_id)
+    await message.answer(result)
+
+
+async def handle_withdraw_amount(message: types.Message, state: FSMContext):
+    """Обработка суммы вывода"""
+    try:
+        amount = int(message.text)
+    except ValueError:
+        await message.answer("❌ Введите число!")
+        return
+    
+    from database import create_withdraw_request
     success, result = await create_withdraw_request(message.from_user.id, amount)
     await message.answer(result)
     await state.clear()
