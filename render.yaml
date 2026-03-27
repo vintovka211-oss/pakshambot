@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: w1npaksham-bot
+    runtime: python
+    repo: https://github.com/ВАШ_АККАУНТ/w1npaksham-bot  # ссылка на репозиторий
+    plan: free
+    region: frankfurt
+    buildCommand: pip install -r requirements.txt
+    startCommand: python3 bot.py
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: PYTHON_VERSION
+        value: 3.11.0
