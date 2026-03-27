@@ -4,6 +4,6 @@ WORKDIR /app
 
 COPY . .
 
-RUN pip install --no-cache-dir aiogram==3.5.0 aiosqlite==0.19.0
+RUN pip install aiogram==3.5.0 aiosqlite==0.19.0
 
 CMD ["python", "bot.py"]
