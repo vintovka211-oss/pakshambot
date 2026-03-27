@@ -1,10 +1,16 @@
 import asyncio
 import logging
+import os
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.filters import Command
 
-from config import BOT_TOKEN, ADMIN_IDS
+# Используем переменную окружения для токена (безопасно!)
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8593186262:AAGN6sTyBa1RlJ0eVWwNVzgYUb6aVy_H9LA")
+
+# ID администраторов
+ADMIN_IDS = [8493522297]
+
 from database import init_db, complete_mine_upgrades, process_withdraw_requests
 from handlers import (
     start_command, handle_callback, handle_bet, handle_donate_amount,
@@ -35,26 +41,27 @@ dp.message.register(handle_withdraw_amount, WithdrawStates.waiting_amount)
 async def scheduler():
     """Фоновая задача"""
     while True:
-        await asyncio.sleep(3600)  # Каждый час
-        
-        # Завершаем улучшения шахт
-        completed = await complete_mine_upgrades()
-        if completed:
-            print(f"✅ Завершено улучшений шахт: {completed}")
-        
-        # Обрабатываем выводы
-        withdraw_count = await process_withdraw_requests()
-        if withdraw_count:
-            print(f"✅ Обработано заявок на вывод: {withdraw_count}")
+        await asyncio.sleep(3600)
+        try:
+            completed = await complete_mine_upgrades()
+            if completed:
+                print(f"✅ Завершено улучшений шахт: {completed}")
+            
+            withdraw_count = await process_withdraw_requests()
+            if withdraw_count:
+                print(f"✅ Обработано заявок на вывод: {withdraw_count}")
+        except Exception as e:
+            print(f"❌ Ошибка в планировщике: {e}")
 
 async def main():
     """Главная функция"""
-    print("🚀 Бот W1NPAKSHAM запускается...")
+    print("🚀 Бот W1NPAKSHAM запускается на Render...")
     print("=" * 40)
     
     await init_db()
     print("✅ База данных подключена")
     
+    # Запуск фоновой задачи
     asyncio.create_task(scheduler())
     print("✅ Планировщик задач запущен")
     
@@ -63,6 +70,23 @@ async def main():
     print(f"👑 Админ ID: {ADMIN_IDS[0]}")
     print("=" * 40)
     
+    # Для Render: запускаем веб-сервер, чтобы бот не отключался
+    from aiohttp import web
+    
+    async def health_check(request):
+        return web.Response(text="OK", status=200)
+    
+    app = web.Application()
+    app.router.add_get("/", health_check)
+    app.router.add_get("/health", health_check)
+    
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", int(os.environ.get("PORT", 8080)))
+    await site.start()
+    print(f"✅ Веб-сервер запущен на порту {os.environ.get('PORT', 8080)}")
+    
+    # Запуск бота
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
