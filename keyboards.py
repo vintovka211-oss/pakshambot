@@ -1,4 +1,9 @@
+"""
+Клавиатуры для бота W1NPAKSHAM
+"""
+
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
 
 def get_main_keyboard() -> InlineKeyboardMarkup:
     """Главное меню"""
@@ -20,14 +25,11 @@ def get_main_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="👑 Премиум", callback_data="premium_buy"),
         ],
         [
-            InlineKeyboardButton(text="⚔️ Клан", callback_data="clan_menu"),
-            InlineKeyboardButton(text="📊 Статистика", callback_data="my_stats"),
-        ],
-        [
             InlineKeyboardButton(text="🏆 ТОП-10", callback_data="top"),
             InlineKeyboardButton(text="❓ Помощь", callback_data="help"),
         ],
     ])
+
 
 def get_games_keyboard() -> InlineKeyboardMarkup:
     """Меню игр"""
@@ -45,11 +47,13 @@ def get_games_keyboard() -> InlineKeyboardMarkup:
         ]
     ])
 
+
 def get_back_keyboard() -> InlineKeyboardMarkup:
     """Кнопка назад"""
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]
     ])
+
 
 def get_premium_keyboard() -> InlineKeyboardMarkup:
     """Премиум меню"""
@@ -62,6 +66,7 @@ def get_premium_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu"),
         ]
     ])
+
 
 def get_mine_keyboard(is_upgrading: bool = False, max_level: bool = False, upgrade_cost: int = None) -> InlineKeyboardMarkup:
     """Клавиатура шахты"""
@@ -80,23 +85,34 @@ def get_mine_keyboard(is_upgrading: bool = False, max_level: bool = False, upgra
     
     return keyboard
 
+
 def get_admin_keyboard() -> InlineKeyboardMarkup:
     """Админ панель"""
     return InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(text="💰 Выдать PAC", callback_data="admin_give_pac"),
-            InlineKeyboardButton(text="👑 Выдать премиум", callback_data="admin_give_premium"),
+            InlineKeyboardButton(text="👑 Выдать премиум", callback_data="admin_give_premium")
         ],
         [
-            InlineKeyboardButton(text="📝 Заявки на вывод", callback_data="admin_withdraw_requests"),
-            InlineKeyboardButton(text="💸 Заявки на пополнение", callback_data="admin_deposit_requests"),
+            InlineKeyboardButton(text="📝 Заявки на вывод", callback_data="admin_withdraw"),
+            InlineKeyboardButton(text="💸 Заявки на пополнение", callback_data="admin_deposit")
         ],
         [
             InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats"),
-            InlineKeyboardButton(text="💰 Моя прибыль", callback_data="admin_profit"),
+            InlineKeyboardButton(text="💰 Моя прибыль", callback_data="admin_profit")
         ],
         [
-            InlineKeyboardButton(text="📢 Рассылка", callback_data="admin_mailing"),
-            InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu"),
+            InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")
         ]
     ])
+
+
+def get_payment_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура выбора способа оплаты"""
+    from config import PAYMENT_METHODS
+    
+    kb = InlineKeyboardMarkup(inline_keyboard=[])
+    for method, name in PAYMENT_METHODS.items():
+        kb.inline_keyboard.append([InlineKeyboardButton(text=f"💳 {name}", callback_data=f"donate_method_{method}")])
+    kb.inline_keyboard.append([InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")])
+    return kb
