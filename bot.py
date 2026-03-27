@@ -1094,8 +1094,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Игнорируем обычные сообщения
     pass
-
-# ==================== ОБРАБОТЧИК CALLBACK ====================
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -1104,115 +1102,134 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ========== ФЕРМА ==========
     if data == "farm_collect":
         await farm_collect(update, context)
+        return
     elif data == "farm_upgrade":
         await farm_upgrade(update, context)
+        return
     elif data == "farm_stats":
         await farm_stats(update, context)
+        return
     elif data == "farm_leaderboard":
         await farm_leaderboard(update, context)
+        return
     
-    # ========== КАЗИНО (с префиксом casino_) ==========
-    elif data == "casino_dice":
+    # ========== КАЗИНО ==========
+    if data == "casino_dice":
         context.user_data['selected_game'] = 'dice'
-        await query.edit_message_text(
-            "🎲 Выбрана игра: КОСТИ\n\n"
-            "💰 Введите ставку в формате: PAK РУБ\n\n"
-            "Пример: 100 50"
-        )
+        await query.edit_message_text("🎲 Выбрана игра: КОСТИ\n\n💰 Введите ставку в формате: PAK РУБ\n\nПример: 100 50")
         context.user_data['waiting_for_bet'] = True
+        return
     elif data == "casino_blackjack":
         context.user_data['selected_game'] = 'blackjack'
-        await query.edit_message_text(
-            "🃏 Выбрана игра: БЛЭКДЖЕК\n\n"
-            "💰 Введите ставку в формате: PAK РУБ\n\n"
-            "Пример: 100 50"
-        )
+        await query.edit_message_text("🃏 Выбрана игра: БЛЭКДЖЕК\n\n💰 Введите ставку в формате: PAK РУБ\n\nПример: 100 50")
         context.user_data['waiting_for_bet'] = True
+        return
     elif data == "casino_slots":
         context.user_data['selected_game'] = 'slots'
-        await query.edit_message_text(
-            "🎰 Выбрана игра: СЛОТЫ\n\n"
-            "💰 Введите ставку в формате: PAK РУБ\n\n"
-            "Пример: 100 50"
-        )
+        await query.edit_message_text("🎰 Выбрана игра: СЛОТЫ\n\n💰 Введите ставку в формате: PAK РУБ\n\nПример: 100 50")
         context.user_data['waiting_for_bet'] = True
+        return
     elif data == "casino_highrisk":
         context.user_data['selected_game'] = 'highrisk'
-        await query.edit_message_text(
-            "💀 Выбрана игра: HIGH RISK\n\n"
-            "💰 Введите ставку в формате: PAK РУБ\n\n"
-            "Пример: 100 50"
-        )
+        await query.edit_message_text("💀 Выбрана игра: HIGH RISK\n\n💰 Введите ставку в формате: PAK РУБ\n\nПример: 100 50")
         context.user_data['waiting_for_bet'] = True
- 
-# ========== КЛАНЫ ==========
-elif data == "clan_list":
-    await clan_list(update, context)
-elif data == "clan_create":
-    await clan_create_start(update, context)
-elif data == "clan_my":
-    await clan_my(update, context)
-elif data == "clan_leave":
-    await clan_leave(update, context)
-elif data == "clan_reward":
-    await clan_reward(update, context)
-elif data == "clan_back":
-    await clan(update, context)
-elif data.startswith("clan_join_"):
-    clan_id = int(data.replace("clan_join_", ""))
-    await clan_join(update, context, clan_id)
-elif data.startswith("clan_requests_"):
-    clan_id = int(data.replace("clan_requests_", ""))
-    await clan_requests(update, context, clan_id)
-elif data.startswith("clan_accept_"):
-    parts = data.split("_")
-    request_id = int(parts[2])
-    clan_id = int(parts[3])
-    await clan_accept(update, context, request_id, clan_id)
-elif data.startswith("clan_reject_"):
-    request_id = int(data.replace("clan_reject_", ""))
-    await clan_reject(update, context, request_id)
-elif data.startswith("clan_kick_"):
-    clan_id = int(data.replace("clan_kick_", ""))
-    await clan_kick(update, context, clan_id)
-elif data.startswith("clan_kick_user_"):
-    parts = data.split("_")
-    clan_id = int(parts[3])
-    user_id = int(parts[4])
-    await clan_kick_user(update, context, clan_id, user_id)
+        return
+    
+    # ========== КЛАНЫ ==========
+    if data == "clan_list":
+        await clan_list(update, context)
+        return
+    elif data == "clan_create":
+        await clan_create_start(update, context)
+        return
+    elif data == "clan_my":
+        await clan_my(update, context)
+        return
+    elif data == "clan_leave":
+        await clan_leave(update, context)
+        return
+    elif data == "clan_reward":
+        await clan_reward(update, context)
+        return
+    elif data == "clan_back":
+        await clan(update, context)
+        return
+    elif data.startswith("clan_join_"):
+        clan_id = int(data.replace("clan_join_", ""))
+        await clan_join(update, context, clan_id)
+        return
+    elif data.startswith("clan_requests_"):
+        clan_id = int(data.replace("clan_requests_", ""))
+        await clan_requests(update, context, clan_id)
+        return
+    elif data.startswith("clan_accept_"):
+        parts = data.split("_")
+        request_id = int(parts[2])
+        clan_id = int(parts[3])
+        await clan_accept(update, context, request_id, clan_id)
+        return
+    elif data.startswith("clan_reject_"):
+        request_id = int(data.replace("clan_reject_", ""))
+        await clan_reject(update, context, request_id)
+        return
+    elif data.startswith("clan_kick_"):
+        clan_id = int(data.replace("clan_kick_", ""))
+        await clan_kick(update, context, clan_id)
+        return
+    elif data.startswith("clan_kick_user_"):
+        parts = data.split("_")
+        clan_id = int(parts[3])
+        user_id = int(parts[4])
+        await clan_kick_user(update, context, clan_id, user_id)
+        return
+    
+    # ========== ПОКУПКИ ==========
+    if data.startswith("buy_pak_"):
+        stars = int(data.replace("buy_pak_", ""))
+        if stars == 1:
+            await process_star_purchase(update, context, 1, 4, 0)
+        elif stars == 5:
+            await process_star_purchase(update, context, 5, 20, 0)
+        elif stars == 10:
+            await process_star_purchase(update, context, 10, 45, 0)
+        elif stars == 50:
+            await process_star_purchase(update, context, 50, 250, 0)
+        return
+    
+    if data.startswith("buy_rub_"):
+        stars = int(data.replace("buy_rub_", ""))
+        if stars == 1:
+            await process_star_purchase(update, context, 1, 0, 1)
+        elif stars == 5:
+            await process_star_purchase(update, context, 5, 0, 5)
+        elif stars == 10:
+            await process_star_purchase(update, context, 10, 0, 11)
+        elif stars == 50:
+            await process_star_purchase(update, context, 50, 0, 60)
+        return
+    
+    if data.startswith("confirm_"):
+        parts = data.split("_")
+        stars = int(parts[1])
+        pak = int(parts[2])
+        rub = int(parts[3])
+        await confirm_buy(update, context, stars, pak, rub)
+        return
+    
+    if data == "cancel_buy":
+        await query.edit_message_text("❌ Покупка отменена")
+        return
+    
+    # ========== ВЫВОД СРЕДСТВ ==========
+    if data == "withdraw_notify":
+        await query.edit_message_text("🔔 Вы будете уведомлены, когда вывод средств станет доступен!")
+        return
+    if data == "withdraw_back":
+        await query.edit_message_text("🔙 Возврат в главное меню")
+        await start(update, context)
+        return
+    
 
-# ========== ПОКУПКИ ==========
-elif data.startswith("buy_pak_"):
-    stars = int(data.replace("buy_pak_", ""))
-    if stars == 1:
-        await process_star_purchase(update, context, 1, 4, 0)
-    elif stars == 5:
-        await process_star_purchase(update, context, 5, 20, 0)
-    elif stars == 10:
-        await process_star_purchase(update, context, 10, 45, 0)
-    elif stars == 50:
-        await process_star_purchase(update, context, 50, 250, 0)
-
-elif data.startswith("buy_rub_"):
-    stars = int(data.replace("buy_rub_", ""))
-    if stars == 1:
-        await process_star_purchase(update, context, 1, 0, 1)
-    elif stars == 5:
-        await process_star_purchase(update, context, 5, 0, 5)
-    elif stars == 10:
-        await process_star_purchase(update, context, 10, 0, 11)
-    elif stars == 50:
-        await process_star_purchase(update, context, 50, 0, 60)
-
-elif data.startswith("confirm_"):
-    parts = data.split("_")
-    stars = int(parts[1])
-    pak = int(parts[2])
-    rub = int(parts[3])
-    await confirm_buy(update, context, stars, pak, rub)
-
-elif data == "cancel_buy":
-    await query.edit_message_text("❌ Покупка отменена")
         
 # ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ КЛАНОВ ====================
 async def clan_create_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
