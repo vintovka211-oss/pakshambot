@@ -1182,7 +1182,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await clan_kick_user(update, context, clan_id, user_id)
 
     # ========== ПОКУПКИ ==========
-    elif data.startswith("buy_pak_"):
+elif data.startswith("buy_pak_"):
     stars = int(data.replace("buy_pak_", ""))
     if stars == 1:
         await process_star_purchase(update, context, 1, 4, 0)
@@ -1193,7 +1193,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif stars == 50:
         await process_star_purchase(update, context, 50, 250, 0)
 
-    elif data.startswith("buy_rub_"):
+elif data.startswith("buy_rub_"):
     stars = int(data.replace("buy_rub_", ""))
     if stars == 1:
         await process_star_purchase(update, context, 1, 0, 1)
@@ -1204,14 +1204,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif stars == 50:
         await process_star_purchase(update, context, 50, 0, 60)
 
-    elif data.startswith("confirm_"):
+elif data.startswith("confirm_"):
     parts = data.split("_")
     stars = int(parts[1])
     pak = int(parts[2])
     rub = int(parts[3])
     await confirm_buy(update, context, stars, pak, rub)
 
-    elif data == "cancel_buy":
+elif data == "cancel_buy":
     await query.edit_message_text("❌ Покупка отменена")
         
 # ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ КЛАНОВ ====================
