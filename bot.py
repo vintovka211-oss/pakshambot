@@ -18,7 +18,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
 # ==================== ИМПОРТ МОДУЛЕЙ ====================
-from config import BOT_TOKEN, ADMIN_IDS, COIN_NAME, CURRENCY
+from config import BOT_TOKEN, ADMIN_IDS, COIN_NAME, CURRENCY, MIN_DONATION, MAX_DONATION, PAYMENT_METHODS, YOUR_WALLETS
 from database import init_db, get_user, update_user, get_top_users
 from keyboards import get_main_keyboard, get_back_keyboard
 from games import play_slots, play_dice, play_roulette
