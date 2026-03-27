@@ -1144,44 +1144,44 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Пример: 100 50"
         )
         context.user_data['waiting_for_bet'] = True
-    
-    # ========== КЛАНЫ ==========
-    elif data == "clan_list":
-        await clan_list(update, context)
-    elif data == "clan_create":
-        await clan_create_start(update, context)
-    elif data == "clan_my":
-        await clan_my(update, context)
-    elif data == "clan_leave":
-        await clan_leave(update, context)
-    elif data == "clan_reward":
-        await clan_reward(update, context)
-    elif data == "clan_back":
-        await clan(update, context)
-    elif data.startswith("clan_join_"):
-        clan_id = int(data.replace("clan_join_", ""))
-        await clan_join(update, context, clan_id)
-    elif data.startswith("clan_requests_"):
-        clan_id = int(data.replace("clan_requests_", ""))
-        await clan_requests(update, context, clan_id)
-    elif data.startswith("clan_accept_"):
-        parts = data.split("_")
-        request_id = int(parts[2])
-        clan_id = int(parts[3])
-        await clan_accept(update, context, request_id, clan_id)
-    elif data.startswith("clan_reject_"):
-        request_id = int(data.replace("clan_reject_", ""))
-        await clan_reject(update, context, request_id)
-    elif data.startswith("clan_kick_"):
-        clan_id = int(data.replace("clan_kick_", ""))
-        await clan_kick(update, context, clan_id)
-    elif data.startswith("clan_kick_user_"):
-        parts = data.split("_")
-        clan_id = int(parts[3])
-        user_id = int(parts[4])
-        await clan_kick_user(update, context, clan_id, user_id)
+ 
+# ========== КЛАНЫ ==========
+elif data == "clan_list":
+    await clan_list(update, context)
+elif data == "clan_create":
+    await clan_create_start(update, context)
+elif data == "clan_my":
+    await clan_my(update, context)
+elif data == "clan_leave":
+    await clan_leave(update, context)
+elif data == "clan_reward":
+    await clan_reward(update, context)
+elif data == "clan_back":
+    await clan(update, context)
+elif data.startswith("clan_join_"):
+    clan_id = int(data.replace("clan_join_", ""))
+    await clan_join(update, context, clan_id)
+elif data.startswith("clan_requests_"):
+    clan_id = int(data.replace("clan_requests_", ""))
+    await clan_requests(update, context, clan_id)
+elif data.startswith("clan_accept_"):
+    parts = data.split("_")
+    request_id = int(parts[2])
+    clan_id = int(parts[3])
+    await clan_accept(update, context, request_id, clan_id)
+elif data.startswith("clan_reject_"):
+    request_id = int(data.replace("clan_reject_", ""))
+    await clan_reject(update, context, request_id)
+elif data.startswith("clan_kick_"):
+    clan_id = int(data.replace("clan_kick_", ""))
+    await clan_kick(update, context, clan_id)
+elif data.startswith("clan_kick_user_"):
+    parts = data.split("_")
+    clan_id = int(parts[3])
+    user_id = int(parts[4])
+    await clan_kick_user(update, context, clan_id, user_id)
 
-    # ========== ПОКУПКИ ==========
+# ========== ПОКУПКИ ==========
 elif data.startswith("buy_pak_"):
     stars = int(data.replace("buy_pak_", ""))
     if stars == 1:
