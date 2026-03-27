@@ -10,6 +10,7 @@ import sys
 import shutil
 from datetime import datetime
 
+from config import MIN_DONATION, MAX_DONATION, PAYMENT_METHODS, YOUR_WALLETS
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.fsm.storage.memory import MemoryStorage
