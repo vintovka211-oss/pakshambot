@@ -1,92 +1,92 @@
+#!/usr/bin/env python3
+"""
+W1NPAKSHAM BOT - Простой и надежный скрипт для Render
+"""
+
 import asyncio
 import logging
 import os
-from aiogram import Bot, Dispatcher
-from aiogram.fsm.storage.memory import MemoryStorage
+import sys
+from datetime import datetime
+from aiohttp import web
+
+from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 
-# Используем переменную окружения для токена (безопасно!)
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "8593186262:AAGN6sTyBa1RlJ0eVWwNVzgYUb6aVy_H9LA")
+# ==================== ИМПОРТ ВАШИХ МОДУЛЕЙ ====================
+from config import BOT_TOKEN, ADMIN_IDS, COIN_NAME, CURRENCY
+from database import get_user, update_user, init_db
+from keyboards import get_main_keyboard
+from handlers import start_command
 
-# ID администраторов
-ADMIN_IDS = [8493522297]
+# ==================== НАСТРОЙКИ ====================
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-from database import init_db, complete_mine_upgrades, process_withdraw_requests
-from handlers import (
-    start_command, handle_callback, handle_bet, handle_donate_amount,
-    handle_donate_method, handle_withdraw_amount, confirm_deposit,
-    GameStates, DonateStates, WithdrawStates
-)
-from admin import handle_admin_callback
-
-# Настройка логирования
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-
+PORT = int(os.environ.get("PORT", 8080))
 bot = Bot(token=BOT_TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 
-# Регистрация обработчиков
-dp.message.register(start_command, Command("start"))
-dp.message.register(confirm_deposit, lambda msg: msg.text and msg.text.startswith("/confirm_"))
-dp.callback_query.register(handle_callback)
-dp.callback_query.register(handle_donate_method, DonateStates.waiting_method)
-dp.message.register(handle_bet, GameStates.waiting_bet)
-dp.message.register(handle_donate_amount, DonateStates.waiting_amount)
-dp.message.register(handle_withdraw_amount, WithdrawStates.waiting_amount)
-
-async def scheduler():
-    """Фоновая задача"""
+# ==================== ПРОСТОЙ KEEP-ALIVE ====================
+async def keep_alive():
+    """Простой пинг чтобы сервер не засыпал"""
     while True:
-        await asyncio.sleep(3600)
+        await asyncio.sleep(300)  # каждые 5 минут
         try:
-            completed = await complete_mine_upgrades()
-            if completed:
-                print(f"✅ Завершено улучшений шахт: {completed}")
-            
-            withdraw_count = await process_withdraw_requests()
-            if withdraw_count:
-                print(f"✅ Обработано заявок на вывод: {withdraw_count}")
+            me = await bot.get_me()
+            logger.info(f"Бот {me.username} жив, время: {datetime.now()}")
         except Exception as e:
-            print(f"❌ Ошибка в планировщике: {e}")
+            logger.error(f"Keep-alive ошибка: {e}")
 
+# ==================== ПРОСТОЙ HEALTH CHECK ====================
+async def health_check(request):
+    """Проверка что бот работает"""
+    return web.Response(text="OK")
+
+# ==================== ПРОСТОЙ БЭКАП ====================
+async def simple_backup():
+    """Простое копирование БД раз в час"""
+    import shutil
+    while True:
+        await asyncio.sleep(3600)  # каждый час
+        try:
+            if os.path.exists("w1npaksham.db"):
+                backup_name = f"backup_{datetime.now().strftime('%Y%m%d')}.db"
+                shutil.copy("w1npaksham.db", backup_name)
+                logger.info(f"Бэкап создан: {backup_name}")
+        except Exception as e:
+            logger.error(f"Бэкап ошибка: {e}")
+
+# ==================== ГЛАВНАЯ ФУНКЦИЯ ====================
 async def main():
-    """Главная функция"""
-    print("🚀 Бот W1NPAKSHAM запускается на Render...")
-    print("=" * 40)
+    """Запуск бота"""
+    print("🚀 Бот запускается...")
     
+    # Инициализация БД
     await init_db()
-    print("✅ База данных подключена")
+    print("✅ База данных готова")
     
-    # Запуск фоновой задачи
-    asyncio.create_task(scheduler())
-    print("✅ Планировщик задач запущен")
+    # Запускаем фоновые задачи
+    asyncio.create_task(keep_alive())
+    asyncio.create_task(simple_backup())
     
-    print("=" * 40)
-    print("🎮 Бот готов к работе!")
-    print(f"👑 Админ ID: {ADMIN_IDS[0]}")
-    print("=" * 40)
-    
-    # Для Render: запускаем веб-сервер, чтобы бот не отключался
-    from aiohttp import web
-    
-    async def health_check(request):
-        return web.Response(text="OK", status=200)
-    
+    # Запускаем веб-сервер для Render
     app = web.Application()
     app.router.add_get("/", health_check)
     app.router.add_get("/health", health_check)
     
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", int(os.environ.get("PORT", 8080)))
+    site = web.TCPSite(runner, "0.0.0.0", PORT)
     await site.start()
-    print(f"✅ Веб-сервер запущен на порту {os.environ.get('PORT', 8080)}")
+    print(f"✅ Веб-сервер на порту {PORT}")
     
-    # Запуск бота
+    # Запускаем бота
+    print("🎮 Бот готов!")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
