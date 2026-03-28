@@ -187,6 +187,9 @@ async def upgrade_mine(user_id):
 
 # ==================== ПРЕМИУМ ====================
 async def buy_premium(user_id):
+    from config import PREMIUM_PRICE_PAC  # ← ДОБАВИЛ ИМПОРТ
+    from datetime import timedelta
+    
     user = await get_user(user_id)
     if user.get("is_premium"):
         return False, "❌ У вас уже есть премиум!"
