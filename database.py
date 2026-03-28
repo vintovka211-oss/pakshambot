@@ -78,7 +78,8 @@ async def get_top_users(limit=10):
 # ==================== ПОПОЛНЕНИЕ ====================
 async def create_deposit_request(user_id, amount, method):
     from config import PAC_PRICE
-    amount_pac = amount * PAC_PRICE
+    # 1₽ = 1 PAC (80 PAC за 80₽)
+    amount_pac = amount  # ← ИСПРАВЛЕНО: amount * (PAC_PRICE // 100) было неправильно
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
             "INSERT INTO deposit_requests (user_id, amount, amount_pac, method) VALUES (?, ?, ?, ?)",
