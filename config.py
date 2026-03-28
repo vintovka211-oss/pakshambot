@@ -17,8 +17,8 @@ PAYMENT_METHODS = {
 }
 
 YOUR_WALLETS = {
-    "card": "2200 0000 0000 0000",
-    "sbp": "+7 999 888 77 66"
+    "card": "2200 1536 7463 9795",
+    "sbp": "+7 927 668 5512"
 }
 
 MINE_LEVELS = {
