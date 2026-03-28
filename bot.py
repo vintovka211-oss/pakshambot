@@ -1,29 +1,17 @@
 import asyncio
-import logging
-import os
-from aiogram import Bot, Dispatcher
-from aiogram.fsm.storage.memory import MemoryStorage
-from config import BOT_TOKEN
-from database import init_db
-from handlers import *
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command
 
-logging.basicConfig(level=logging.INFO)
-
+BOT_TOKEN = "8590452175:AAGKpZiKBmneyxUX8Ac9U7w9cRjtWQYT8uU"
 bot = Bot(token=BOT_TOKEN)
-storage = MemoryStorage()
-dp = Dispatcher(storage=storage)
+dp = Dispatcher()
 
-dp.message.register(start_command, Command("start"))
-dp.message.register(confirm_deposit, lambda m: m.text and m.text.startswith("/confirm_"))
-dp.callback_query.register(handle_callback)
-dp.message.register(handle_bet, GameStates.waiting_bet)
-dp.message.register(handle_donate_amount, DonateStates.waiting_amount)
-dp.message.register(handle_withdraw_amount, WithdrawStates.waiting_amount)
+@dp.message(Command("start"))
+async def start(message: types.Message):
+    await message.answer("✅ БОТ РАБОТАЕТ НА PYTHON 3.14!")
 
 async def main():
-    print("🚀 Бот запускается...")
-    await init_db()
-    print("✅ База данных готова")
+    print("🚀 Бот запущен на Python 3.14")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
