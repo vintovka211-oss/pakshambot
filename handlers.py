@@ -199,16 +199,11 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
         )
         await state.set_state(DonateStates.waiting_amount)
     
-    # ВЫВОД
+    # ВЫВОД (ВРЕМЕННО ОТКЛЮЧЕН)
     elif data == "withdraw":
-        user = await get_user(user_id)
-        await callback.message.edit_text(
-            f"💸 Баланс: {user['pac_balance']} {COIN_NAME}\nМин. вывод: {MIN_WITHDRAW_PAC} {COIN_NAME}\n\nВведите сумму:",
-            reply_markup=get_back_keyboard()
-        )
-        await state.set_state(WithdrawStates.waiting_amount)
+        await callback.answer("⏸️ Вывод временно недоступен. Ведутся технические работы.", show_alert=True)
     
-            # ПРЕМИУМ
+    # ПРЕМИУМ
     elif data == "premium":
         user = await get_user(user_id)
         if user.get("is_premium"):
@@ -251,6 +246,7 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
         if "error" in info:
             await callback.message.edit_text(info["error"], reply_markup=get_back_keyboard())
         else:
+            from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
             kb = InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="⛏️ Собрать", callback_data="mine_collect")],
                 [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]
@@ -271,6 +267,7 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
         await callback.answer(msg, show_alert=True)
         if success:
             info = await get_mine_info(user_id)
+            from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
             kb = InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="⛏️ Собрать", callback_data="mine_collect")],
                 [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]
@@ -291,6 +288,7 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
         await callback.answer(msg, show_alert=True)
         if success:
             info = await get_mine_info(user_id)
+            from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
             kb = InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="⛏️ Собрать", callback_data="mine_collect")],
                 [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]
@@ -335,7 +333,7 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
             "❓ **Помощь**\n\n"
             "🎮 **Игры:** Слоты, Кубик, Рулетка, Блэкджек, Мины, Колесо, Орёл/Решка\n"
             "💰 **Пополнение:** кнопка Пополнить\n"
-            "💸 **Вывод:** раз в неделю, комиссия 0%\n"
+            "💸 **Вывод:** временно недоступен\n"
             "👑 **Премиум:** шахта +15 PAC/день\n"
             "⛏️ **Шахта:** пассивный доход\n\n"
             "📞 **По вопросам:** @ZOJlOTOY"
@@ -346,6 +344,13 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
     elif data == "daily":
         success, msg = await claim_daily_bonus(user_id)
         await callback.answer(msg, show_alert=True)
+        if success:
+            user = await get_user(user_id)
+            await callback.message.edit_text(
+                f"👤 ID: {user_id}\n💎 {COIN_NAME}: {user['pac_balance']}",
+                reply_markup=get_main_keyboard(),
+                parse_mode="Markdown"
+            )
     
     # РЕФЕРАЛЫ
     elif data == "referral":
@@ -444,14 +449,7 @@ async def handle_donate_method(callback: types.CallbackQuery, state: FSMContext)
     await state.clear()
 
 async def handle_withdraw_amount(message: types.Message, state: FSMContext):
-    try:
-        amount = int(message.text)
-    except:
-        await message.answer("❌ Введите число!")
-        return
-    
-    success, result = await create_withdraw_request(message.from_user.id, amount)
-    await message.answer(result)
+    await message.answer("⏸️ Вывод временно недоступен. Ведутся технические работы.")
     await state.clear()
 
 async def confirm_deposit(message: types.Message):
