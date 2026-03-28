@@ -22,5 +22,9 @@ YOUR_WALLETS = {
 MINE_LEVELS = {
     1: {"name": "⛏️ Каменная", "daily_output": 10, "upgrade_cost": 500, "icon": "🪨"},
     2: {"name": "⚒️ Угольная", "daily_output": 20, "upgrade_cost": 1500, "icon": "⚫"},
-    3: {"name": "💎 Железная", "daily_output": 35, "upgrade_cost": 4000, "icon": "🔩"},
+    3: {"name": "🔩 Железная", "daily_output": 35, "upgrade_cost": 4000, "icon": "🔩"},
+    4: {"name": "⭐ Золотая", "daily_output": 60, "upgrade_cost": 10000, "icon": "⭐"},
+    5: {"name": "💎 Алмазная", "daily_output": 100, "upgrade_cost": 20000, "icon": "💎"},
+    6: {"name": "👑 Изумрудная", "daily_output": 150, "upgrade_cost": 40000, "icon": "🟢"},
+    7: {"name": "🌌 Космическая", "daily_output": 250, "upgrade_cost": None, "icon": "🌠"},
 }
