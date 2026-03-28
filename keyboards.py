@@ -1,4 +1,5 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from config import PREMIUM_PRICE_PAC, COIN_NAME
 
 def get_main_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
