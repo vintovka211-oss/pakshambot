@@ -33,20 +33,13 @@ async def init_db():
             )
         ''')
         await db.execute('''
-            CREATE TABLE IF NOT EXISTS withdraw_requests (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                amount_pac INTEGER,
-                status TEXT DEFAULT 'pending'
-            )
-        ''')
-        await db.execute('''
             CREATE TABLE IF NOT EXISTS transactions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER,
                 type TEXT,
                 amount INTEGER,
-                description TEXT
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
         await db.commit()
@@ -82,9 +75,10 @@ async def get_top_users(limit=10):
         async with db.execute("SELECT user_id, username, turnover FROM users ORDER BY turnover DESC LIMIT ?", (limit,)) as cursor:
             return await cursor.fetchall()
 
+# ==================== ПОПОЛНЕНИЕ ====================
 async def create_deposit_request(user_id, amount, method):
     from config import PAC_PRICE
-    amount_pac = amount * (PAC_PRICE // 100) * 100
+    amount_pac = amount * PAC_PRICE
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
             "INSERT INTO deposit_requests (user_id, amount, amount_pac, method) VALUES (?, ?, ?, ?)",
@@ -106,21 +100,9 @@ async def approve_deposit(request_id):
         await db.commit()
         return True, f"✅ Пополнено {amount_pac} PAC!"
 
+# ==================== ВЫВОД (ВРЕМЕННО НЕДОСТУПЕН) ====================
 async def create_withdraw_request(user_id, amount_pac):
-    from config import MIN_WITHDRAW_PAC
-    user = await get_user(user_id)
-    if amount_pac < MIN_WITHDRAW_PAC:
-        return False, f"❌ Минимум {MIN_WITHDRAW_PAC} PAC"
-    if user["pac_balance"] < amount_pac:
-        return False, "❌ Недостаточно средств"
-    async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute(
-            "INSERT INTO withdraw_requests (user_id, amount_pac) VALUES (?, ?)",
-            (user_id, amount_pac)
-        )
-        await db.commit()
-        await update_user(user_id, pac_balance=user["pac_balance"] - amount_pac)
-        return True, f"✅ Заявка #{cursor.lastrowid} создана!"
+    return False, "⏸️ Вывод временно недоступен. Ведутся технические работы."
 
 # ==================== ЕЖЕДНЕВНЫЙ БОНУС ====================
 async def claim_daily_bonus(user_id):
@@ -202,3 +184,21 @@ async def upgrade_mine(user_id):
     )
     await add_transaction(user_id, "mine_upgrade", -cost, f"Улучшение шахты до {current_level + 1} уровня")
     return True, f"✅ Шахта улучшена до {next_level_data['name']}!"
+
+# ==================== ПРЕМИУМ ====================
+async def buy_premium(user_id):
+    user = await get_user(user_id)
+    if user.get("is_premium"):
+        return False, "❌ У вас уже есть премиум!"
+    
+    if user["pac_balance"] < PREMIUM_PRICE_PAC:
+        return False, f"❌ Нужно {PREMIUM_PRICE_PAC} PAC!"
+    
+    premium_until = (datetime.now() + timedelta(days=30)).isoformat()
+    await update_user(user_id, 
+        pac_balance=user["pac_balance"] - PREMIUM_PRICE_PAC,
+        is_premium=1,
+        premium_until=premium_until
+    )
+    await add_transaction(user_id, "premium", -PREMIUM_PRICE_PAC, "Премиум подписка")
+    return True, f"✅ Премиум активирован на 30 дней!"
