@@ -208,7 +208,7 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
         )
         await state.set_state(WithdrawStates.waiting_amount)
     
-    # ПРЕМИУМ
+        # ПРЕМИУМ
     elif data == "premium":
         user = await get_user(user_id)
         if user.get("is_premium"):
@@ -218,14 +218,19 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
                 reply_markup=get_back_keyboard()
             )
         else:
+            from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+            kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text=f"💎 Купить за {PREMIUM_PRICE_PAC} PAC", callback_data="buy_premium")],
+                [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]
+            ])
             await callback.message.edit_text(
                 f"👑 **Премиум подписка**\n\n"
                 f"💰 {PREMIUM_PRICE_PAC} {COIN_NAME}\n\n"
                 f"✨ **Преимущества:**\n"
-                f"• ⛏️ Шахта (до 100 PAC/день)\n"
+                f"• ⛏️ Шахта (до 35 PAC/день)\n"
                 f"• +15 PAC/день бонус\n\n"
-                f"Купить за {COIN_NAME}? Напишите /premium",
-                reply_markup=get_back_keyboard(),
+                f"Купить подписку?",
+                reply_markup=kb,
                 parse_mode="Markdown"
             )
     
