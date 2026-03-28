@@ -16,6 +16,10 @@ dp = Dispatcher(storage=storage)
 # ==================== ВСЕ РЕГИСТРАЦИИ ====================
 dp.message.register(start_command, Command("start"))
 dp.message.register(confirm_deposit, lambda m: m.text and m.text.startswith("/confirm_"))
+
+# РЕГИСТРИРУЕМ АДМИН-КОМАНДУ
+dp.message.register(admin_panel, Command("admin"))
+
 dp.message.register(admin_process_user_id, AdminStates.waiting_user_id)
 dp.message.register(admin_process_amount, AdminStates.waiting_amount)
 dp.message.register(admin_process_premium, AdminStates.waiting_premium_days)
