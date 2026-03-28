@@ -208,7 +208,7 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
         )
         await state.set_state(WithdrawStates.waiting_amount)
     
-        # ПРЕМИУМ
+            # ПРЕМИУМ
     elif data == "premium":
         user = await get_user(user_id)
         if user.get("is_premium"):
@@ -231,6 +231,17 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
                 f"• +15 PAC/день бонус\n\n"
                 f"Купить подписку?",
                 reply_markup=kb,
+                parse_mode="Markdown"
+            )
+    
+    elif data == "buy_premium":
+        success, msg = await buy_premium(user_id)
+        await callback.answer(msg, show_alert=True)
+        if success:
+            user = await get_user(user_id)
+            await callback.message.edit_text(
+                f"👤 ID: {user_id}\n💎 {COIN_NAME}: {user['pac_balance']}",
+                reply_markup=get_main_keyboard(),
                 parse_mode="Markdown"
             )
     
