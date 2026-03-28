@@ -1,6 +1,7 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 def get_main_keyboard():
+    """Главное меню"""
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🎮 Играть", callback_data="games"),
          InlineKeyboardButton(text="💰 Пополнить", callback_data="deposit")],
@@ -12,9 +13,11 @@ def get_main_keyboard():
          InlineKeyboardButton(text="❓ Помощь", callback_data="help")],
         [InlineKeyboardButton(text="👥 Рефералы", callback_data="referral"),
          InlineKeyboardButton(text="🎁 Ежедневный", callback_data="daily")],
+        [InlineKeyboardButton(text="🛡️ Админ панель", callback_data="admin_panel")],  # ← КНОПКА АДМИНА
     ])
 
 def get_games_keyboard():
+    """Меню игр"""
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🎰 Слоты", callback_data="game_slots"),
          InlineKeyboardButton(text="🎲 Кубик", callback_data="game_dice")],
@@ -27,11 +30,13 @@ def get_games_keyboard():
     ])
 
 def get_back_keyboard():
+    """Кнопка назад"""
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]
     ])
 
 def get_payment_keyboard():
+    """Клавиатура выбора способа оплаты"""
     from config import PAYMENT_METHODS
     kb = InlineKeyboardMarkup(inline_keyboard=[])
     for method, name in PAYMENT_METHODS.items():
@@ -40,6 +45,7 @@ def get_payment_keyboard():
     return kb
 
 def get_admin_keyboard():
+    """Админ панель"""
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💰 Выдать PAC", callback_data="admin_give_pac"),
          InlineKeyboardButton(text="👑 Выдать премиум", callback_data="admin_give_premium")],
