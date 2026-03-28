@@ -21,14 +21,13 @@ TOURNAMENT_COMMISSION = 20
 
 PAYMENT_METHODS = {
     "card": "Карта РФ",
-    "crypto": "USDT (TRC20)"
+    "sbp": "СБП"          # ← ДОБАВЬТЕ ЭТУ СТРОКУ
 }
 
 YOUR_WALLETS = {
-    "card": "2200 0000 0000 0000",
-    "crypto": "TXhjUqkqZxXxXxXxXxXxXxXxXxXxXx"
+    "card": "2200 1536 7463 9795",
+    "sbp": "+7 927 668-55-12"     # ← ВАШ НОМЕР ТЕЛЕФОНА ДЛЯ СБП
 }
-
 RANKS = {
     0: {"name": "Новичок", "cashback": 1, "icon": "🟤", "min_donate": 0},
     1000: {"name": "Рекрут", "cashback": 2, "icon": "⚪", "min_donate": 0},
