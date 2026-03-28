@@ -191,13 +191,25 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
         await state.update_data(game="coin")
         await state.set_state(GameStates.waiting_bet)
     
-    # ПОПОЛНЕНИЕ
+        # ПОПОЛНЕНИЕ
     elif data == "deposit":
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🟢 10 PAC (8₽)", url=PAYMENT_LINKS.get(10, "https://t.me/CryptoBot"))],
+            [InlineKeyboardButton(text="🟡 50 PAC (40₽)", url=PAYMENT_LINKS.get(50, "https://t.me/CryptoBot"))],
+            [InlineKeyboardButton(text="🔵 100 PAC (80₽)", url=PAYMENT_LINKS.get(100, "https://t.me/CryptoBot"))],
+            [InlineKeyboardButton(text="🟣 500 PAC (400₽)", url=PAYMENT_LINKS.get(500, "https://t.me/CryptoBot"))],
+            [InlineKeyboardButton(text="💎 1000 PAC (800₽)", url=PAYMENT_LINKS.get(1000, "https://t.me/CryptoBot"))],
+            [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]
+        ])
         await callback.message.edit_text(
-            f"💎 Введите сумму в ₽ (1₽ = {PAC_PRICE//100} PAC):",
-            reply_markup=get_back_keyboard()
+            f"💎 **Пополнение {COIN_NAME}**\n\n"
+            f"💰 1 {COIN_NAME} = 0.8₽\n"
+            f"⚡ Минимальная покупка: 10 {COIN_NAME} (8₽)\n\n"
+            f"Выберите сумму для оплаты через CryptoBot:",
+            reply_markup=kb,
+            parse_mode="Markdown"
         )
-        await state.set_state(DonateStates.waiting_amount)
     
     # ВЫВОД (ВРЕМЕННО ОТКЛЮЧЕН)
     elif data == "withdraw":
