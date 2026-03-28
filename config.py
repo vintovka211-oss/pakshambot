@@ -9,7 +9,7 @@ CURRENCY = "PAC"
 PAC_PRICE = 80
 MIN_WITHDRAW_PAC = 250
 PREMIUM_PRICE_PAC = 350
-GAME_COMMISSION = 5
+GAME_COMMISSION = 10  # ← 10% комиссии (ваша прибыль)
 
 PAYMENT_METHODS = {
     "card": "Карта РФ",
