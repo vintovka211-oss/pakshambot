@@ -12,9 +12,9 @@ def get_main_keyboard():
         [InlineKeyboardButton(text="🏪 Магазин", callback_data="shop"),
          InlineKeyboardButton(text="🏆 ТОП-10", callback_data="top")],
         [InlineKeyboardButton(text="❓ Помощь", callback_data="help"),
+         InlineKeyboardButton(text="👥 Рефералы", callback_data="referral")],
+        [InlineKeyboardButton(text="🎁 Ежедневный", callback_data="daily"),
          InlineKeyboardButton(text="🛡️ Админ панель", callback_data="admin_panel")],
-        [InlineKeyboardButton(text="👥 Рефералы", callback_data="referral"),
-         InlineKeyboardButton(text="🎁 Ежедневный", callback_data="daily")],
     ])
 
 def get_games_keyboard():
@@ -139,7 +139,6 @@ def get_rpg_keyboard():
         [InlineKeyboardButton(text="🛡️ Мой инвентарь", callback_data="my_inventory")],
         [InlineKeyboardButton(text="📊 Мои характеристики", callback_data="my_stats_rpg")],
         [InlineKeyboardButton(text="❤️ Использовать зелье", callback_data="use_potion")],
-        [InlineKeyboardButton(text="🎁 Лутбокс", callback_data="lottery_box")],
         [InlineKeyboardButton(text="🔄 Обменять RPG на PAC", callback_data="exchange_rpg")],
         [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")],
     ])
@@ -150,6 +149,13 @@ def get_boss_keyboard():
         kb.inline_keyboard.append([InlineKeyboardButton(text=f"{boss['icon']} {boss['name']} (HP: {boss['hp']})", callback_data=f"boss_{bid}")])
     kb.inline_keyboard.append([InlineKeyboardButton(text="◀️ Назад", callback_data="rpg_menu")])
     return kb
+
+def get_fight_keyboard(boss_id, player_hp, boss_hp, player_attack, boss_attack):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="⚔️ Атаковать", callback_data=f"fight_attack_{boss_id}_{player_hp}_{boss_hp}_{player_attack}_{boss_attack}")],
+        [InlineKeyboardButton(text="🧪 Использовать зелье", callback_data=f"fight_heal_{boss_id}_{player_hp}_{boss_hp}_{player_attack}_{boss_attack}")],
+        [InlineKeyboardButton(text="🏃 Сбежать", callback_data="rpg_menu")],
+    ])
 
 def get_shop_keyboard():
     kb = InlineKeyboardMarkup(inline_keyboard=[])
