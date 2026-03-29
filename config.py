@@ -4,19 +4,20 @@ BOT_TOKEN = "8590452175:AAGKpZiKBmneyxUX8Ac9U7w9cRjtWQYT8uU"
 ADMIN_IDS = [8493522297]
 
 COIN_NAME = "PAC"
-PAC_PRICE = 80
-MIN_WITHDRAW_PAC = 250
-PREMIUM_PRICE_PAC = 350
-GAME_COMMISSION = 10
+BONUS_PAC = 100
 
-PAYMENT_METHODS = {
-    "card": "Карта РФ",
-    "sbp": "СБП"
-}
+# Кнопки ставок
+BET_BUTTONS = [1, 5, 10, 25, 50, 100, 250, 500, 1000]
 
-YOUR_WALLETS = {
-    "card": "2200 1536 7463 9795",
-    "sbp": "+7 927 668 55 12"
+# Маркетплейс
+MARKETPLACE_ITEMS = {
+    "gold_card": {"name": "🏆 Золотая карта", "price": 500, "emoji": "🏆", "description": "+5% к выигрышу на 7 дней"},
+    "diamond_card": {"name": "💎 Алмазная карта", "price": 1500, "emoji": "💎", "description": "+15% к выигрышу на 30 дней"},
+    "lucky_coin": {"name": "🍀 Счастливая монета", "price": 200, "emoji": "🍀", "description": "Увеличивает шанс на 10%"},
+    "mystery_box": {"name": "🎁 Тайный сундук", "price": 100, "emoji": "🎁", "description": "Случайный бонус от 50 до 500 PAC"},
+    "vip_pass": {"name": "👑 VIP пропуск", "price": 3000, "emoji": "👑", "description": "Доступ к VIP-играм"},
+    "four_leaf": {"name": "🍀 Четырёхлистный клевер", "price": 800, "emoji": "🍀", "description": "Шанс на выигрыш +15%"},
+    "rabbit_foot": {"name": "🐰 Кроличья лапка", "price": 1200, "emoji": "🐰", "description": "Удача +20% на 14 дней"},
 }
 
 MINE_LEVELS = {
@@ -28,3 +29,6 @@ MINE_LEVELS = {
     6: {"name": "👑 Изумрудная", "daily_output": 150, "upgrade_cost": 40000, "icon": "🟢"},
     7: {"name": "🌌 Космическая", "daily_output": 250, "upgrade_cost": None, "icon": "🌠"},
 }
+
+SBP_PHONE = "+7 999 888 77 66"
+PREMIUM_PRICE_PAC = 350
