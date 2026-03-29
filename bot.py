@@ -21,7 +21,7 @@ dp.message.register(admin_process_premium, AdminStates.waiting_days)
 dp.callback_query.register(handle_callback)
 
 async def main():
-    print("🚀 Бот запускается с 15 играми + Премиум + Маркетплейс!")
+    print("🚀 Бот запускается с полной RPG системой!")
     await init_db()
     print("✅ База данных готова")
     await dp.start_polling(bot)
