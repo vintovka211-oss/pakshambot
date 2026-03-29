@@ -1,5 +1,5 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from config import PREMIUM_PRICE_PAC, COIN_NAME
+from config import BET_BUTTONS, MARKETPLACE_ITEMS
 
 def get_main_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -13,7 +13,8 @@ def get_main_keyboard():
          InlineKeyboardButton(text="❓ Помощь", callback_data="help")],
         [InlineKeyboardButton(text="👥 Рефералы", callback_data="referral"),
          InlineKeyboardButton(text="🎁 Ежедневный", callback_data="daily")],
-        [InlineKeyboardButton(text="🛡️ Админ панель", callback_data="admin_panel")],
+        [InlineKeyboardButton(text="🛒 Маркетплейс", callback_data="marketplace"),
+         InlineKeyboardButton(text="🛡️ Админ панель", callback_data="admin_panel")],
     ])
 
 def get_games_keyboard():
@@ -21,11 +22,127 @@ def get_games_keyboard():
         [InlineKeyboardButton(text="🎰 Слоты", callback_data="game_slots"),
          InlineKeyboardButton(text="🎲 Кубик", callback_data="game_dice")],
         [InlineKeyboardButton(text="🎡 Рулетка", callback_data="game_roulette"),
-         InlineKeyboardButton(text="🃏 21", callback_data="game_blackjack")],
+         InlineKeyboardButton(text="🃏 Блэкджек", callback_data="game_blackjack")],
         [InlineKeyboardButton(text="💣 Мины", callback_data="game_mines"),
          InlineKeyboardButton(text="🎡 Колесо", callback_data="game_wheel")],
         [InlineKeyboardButton(text="🪙 Орёл/Решка", callback_data="game_coin"),
+         InlineKeyboardButton(text="🥢 Палки", callback_data="game_sticks")],
+        [InlineKeyboardButton(text="📈 Больше-Меньше", callback_data="game_highlow"),
+         InlineKeyboardButton(text="🎲 Кено", callback_data="game_keno")],
+        [InlineKeyboardButton(text="🃏 Баккара", callback_data="game_baccarat"),
+         InlineKeyboardButton(text="🃏 Покер", callback_data="game_poker")],
+        [InlineKeyboardButton(text="🎲 Крэпс", callback_data="game_craps"),
+         InlineKeyboardButton(text="🎰 Видео-покер", callback_data="game_video_poker")],
+        [InlineKeyboardButton(text="7️⃣ Лакки 7", callback_data="game_lucky7"),
          InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")],
+    ])
+
+def get_bet_keyboard(game):
+    buttons = []
+    row = []
+    for i, bet in enumerate(BET_BUTTONS):
+        row.append(InlineKeyboardButton(text=f"{bet}", callback_data=f"{game}_bet_{bet}"))
+        if len(row) == 4:
+            buttons.append(row)
+            row = []
+    if row:
+        buttons.append(row)
+    buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="games")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def get_roulette_choice_keyboard(bet):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔴 Красное", callback_data=f"roulette_choice_🔴_{bet}"),
+         InlineKeyboardButton(text="⚫ Чёрное", callback_data=f"roulette_choice_⚫_{bet}")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="games")]
+    ])
+
+def get_dice_choice_keyboard(bet):
+    buttons = []
+    row = []
+    for i in range(1, 7):
+        row.append(InlineKeyboardButton(text=str(i), callback_data=f"dice_choice_{i}_{bet}"))
+        if len(row) == 3:
+            buttons.append(row)
+            row = []
+    if row:
+        buttons.append(row)
+    buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="games")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def get_coin_choice_keyboard(bet):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🪙 Орёл", callback_data=f"coin_choice_орел_{bet}"),
+         InlineKeyboardButton(text="🪙 Решка", callback_data=f"coin_choice_решка_{bet}")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="games")]
+    ])
+
+def get_mines_choice_keyboard(bet):
+    buttons = []
+    row = []
+    for i in range(1, 10):
+        row.append(InlineKeyboardButton(text=str(i), callback_data=f"mines_choice_{i}_{bet}"))
+        if len(row) == 3:
+            buttons.append(row)
+            row = []
+    if row:
+        buttons.append(row)
+    buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="games")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def get_sticks_choice_keyboard(bet):
+    buttons = []
+    row = []
+    for i in range(1, 11):
+        row.append(InlineKeyboardButton(text=str(i), callback_data=f"sticks_choice_{i}_{bet}"))
+        if len(row) == 5:
+            buttons.append(row)
+            row = []
+    if row:
+        buttons.append(row)
+    buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="games")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def get_highlow_choice_keyboard(bet):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📈 Больше 50", callback_data=f"highlow_choice_high_{bet}"),
+         InlineKeyboardButton(text="📉 Меньше 50", callback_data=f"highlow_choice_low_{bet}")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="games")]
+    ])
+
+def get_keno_choice_keyboard(bet):
+    buttons = []
+    row = []
+    for i in range(1, 81):
+        row.append(InlineKeyboardButton(text=str(i), callback_data=f"keno_choice_{i}_{bet}"))
+        if len(row) == 10:
+            buttons.append(row)
+            row = []
+        if len(buttons) >= 8:
+            break
+    buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="games")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def get_baccarat_choice_keyboard(bet):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="👤 Игрок", callback_data=f"baccarat_choice_player_{bet}"),
+         InlineKeyboardButton(text="🏦 Банкир", callback_data=f"baccarat_choice_banker_{bet}")],
+        [InlineKeyboardButton(text="🤝 Ничья", callback_data=f"baccarat_choice_tie_{bet}")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="games")]
+    ])
+
+def get_marketplace_keyboard():
+    buttons = []
+    for item_id, item in MARKETPLACE_ITEMS.items():
+        buttons.append([InlineKeyboardButton(text=f"{item['emoji']} {item['name']} - {item['price']} PAC", callback_data=f"buy_{item_id}")])
+    buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def get_payment_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💳 СБП (по номеру телефона)", callback_data="pay_sbp")],
+        [InlineKeyboardButton(text="🪙 CryptoBot (криптовалюта)", callback_data="pay_crypto")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]
     ])
 
 def get_back_keyboard():
@@ -33,17 +150,10 @@ def get_back_keyboard():
         [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]
     ])
 
-def get_payment_keyboard():
-    from config import PAYMENT_METHODS
-    kb = InlineKeyboardMarkup(inline_keyboard=[])
-    for method, name in PAYMENT_METHODS.items():
-        kb.inline_keyboard.append([InlineKeyboardButton(text=f"💳 {name}", callback_data=f"donate_method_{method}")])
-    kb.inline_keyboard.append([InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")])
-    return kb
-
 def get_admin_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💰 Выдать PAC", callback_data="admin_give_pac")],
         [InlineKeyboardButton(text="👑 Выдать премиум", callback_data="admin_give_premium")],
+        [InlineKeyboardButton(text="🎁 Выдать бонус", callback_data="admin_give_bonus")],
         [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")],
     ])
