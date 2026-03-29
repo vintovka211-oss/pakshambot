@@ -642,29 +642,31 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
     
     elif data.startswith("boss_"):
         boss_id = int(data.split("_")[1])
-        await fight_boss_start(user_id, boss_id, callback.message)
+        success, fight_data = await fight_boss_start(user_id, boss_id, callback.message)
     
     elif data.startswith("fight_attack_"):
-        parts = data.split("_")
-        boss_id = int(parts[2])
-        player_hp = int(parts[3])
-        boss_hp = int(parts[4])
-        player_attack = int(parts[5])
-        boss_attack = int(parts[6])
-        result, status = await fight_attack(user_id, boss_id, player_hp, boss_hp, player_attack, boss_attack, callback.message)
-        if status == "win":
+        encoded = data.replace("fight_attack_", "")
+        parts = encoded.split("|")
+        fight_data = {
+            "boss_id": int(parts[0]),
+            "player_hp": int(parts[1]),
+            "boss_hp": int(parts[2]),
+            "player_attack": int(parts[3]),
+            "boss_attack": int(parts[4])
+        }
+        result = await fight_attack(user_id, callback, fight_data)
+        if result == "win":
             user = await get_user(user_id)
             stats = await get_player_stats(user_id)
             await callback.message.edit_text(
                 f"⚔️ **RPG РАЗДЕЛ** ⚔️\n\n"
-                f"📊 Уровень: {stats['level']}\n"
                 f"❤️ HP: {stats['hp']}/{stats['max_hp']}\n"
                 f"🪙 {RPG_COIN_NAME}: {user['rpg_balance']}\n\n"
                 f"Выберите действие:",
                 reply_markup=get_rpg_keyboard(),
                 parse_mode="Markdown"
             )
-        elif status == "lose":
+        elif result == "lose":
             user = await get_user(user_id)
             stats = await get_player_stats(user_id)
             await callback.message.edit_text(
@@ -676,13 +678,16 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
             )
     
     elif data.startswith("fight_heal_"):
-        parts = data.split("_")
-        boss_id = int(parts[2])
-        player_hp = int(parts[3])
-        boss_hp = int(parts[4])
-        player_attack = int(parts[5])
-        boss_attack = int(parts[6])
-        new_hp = await heal_in_fight(user_id, callback.message, boss_id, player_hp, boss_hp, player_attack, boss_attack)
+        encoded = data.replace("fight_heal_", "")
+        parts = encoded.split("|")
+        fight_data = {
+            "boss_id": int(parts[0]),
+            "player_hp": int(parts[1]),
+            "boss_hp": int(parts[2]),
+            "player_attack": int(parts[3]),
+            "boss_attack": int(parts[4])
+        }
+        result = await fight_heal(user_id, callback, fight_data)
     
     # ПЕЩЕРА
     elif data == "cave":
@@ -718,10 +723,38 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
     elif data == "upgrade_weapon":
         success, result = await upgrade_weapon(user_id)
         await callback.answer(result, show_alert=True)
+        if success:
+            stats = await get_player_stats(user_id)
+            await callback.message.edit_text(
+                f"🔨 **Кузнец**\n\n"
+                f"🗡️ Оружие: +{stats['weapon_upgrade']}\n"
+                f"🛡️ Броня: +{stats['armor_upgrade']}\n\n"
+                f"Выберите действие:",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="🗡️ Улучшить оружие", callback_data="upgrade_weapon")],
+                    [InlineKeyboardButton(text="🛡️ Улучшить броню", callback_data="upgrade_armor")],
+                    [InlineKeyboardButton(text="◀️ Назад", callback_data="rpg_menu")]
+                ]),
+                parse_mode="Markdown"
+            )
     
     elif data == "upgrade_armor":
         success, result = await upgrade_armor(user_id)
         await callback.answer(result, show_alert=True)
+        if success:
+            stats = await get_player_stats(user_id)
+            await callback.message.edit_text(
+                f"🔨 **Кузнец**\n\n"
+                f"🗡️ Оружие: +{stats['weapon_upgrade']}\n"
+                f"🛡️ Броня: +{stats['armor_upgrade']}\n\n"
+                f"Выберите действие:",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="🗡️ Улучшить оружие", callback_data="upgrade_weapon")],
+                    [InlineKeyboardButton(text="🛡️ Улучшить броню", callback_data="upgrade_armor")],
+                    [InlineKeyboardButton(text="◀️ Назад", callback_data="rpg_menu")]
+                ]),
+                parse_mode="Markdown"
+            )
     
     # МАГАЗИН
     elif data == "shop":
