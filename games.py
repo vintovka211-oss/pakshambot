@@ -1,10 +1,9 @@
 import random
 import asyncio
 from datetime import datetime
-from config import BET_BUTTONS, COIN_NAME
+from config import COIN_NAME
 from database import get_user, update_user, add_transaction
 
-# ==================== УМНЫЙ ШАНС (УМЕНЬШЕНИЕ В 3 РАЗА) ====================
 async def get_win_chance(user_id):
     user = await get_user(user_id)
     consecutive_wins = user.get("consecutive_wins", 0)
@@ -19,7 +18,6 @@ async def apply_win_reduction(user_id, won):
     else:
         await update_user(user_id, consecutive_wins=0)
 
-# ==================== АНИМАЦИЯ ВЫИГРЫША ====================
 async def show_animation(message, win_amount):
     frames = ["🎲", "🎰", "🎯", "💰", "💎", "🏆"]
     msg = await message.answer("🎲")
@@ -29,7 +27,7 @@ async def show_animation(message, win_amount):
     await msg.delete()
     await message.answer(f"🎉 **ПОБЕДА! +{win_amount} {COIN_NAME}!** 🎉", parse_mode="Markdown")
 
-# ==================== ИГРА 1: СЛОТЫ ====================
+# ИГРА 1: СЛОТЫ
 async def play_slots(user_id, bet):
     user = await get_user(user_id)
     if bet <= 0:
@@ -41,7 +39,7 @@ async def play_slots(user_id, bet):
     is_win = random.random() < chance
     
     if is_win:
-        multiplier = random.choice([1.5, 2, 3, 5, 8])
+        multiplier = random.choice([1.5, 2, 3, 5])
         win = int(bet * multiplier)
         await apply_win_reduction(user_id, True)
     else:
@@ -58,7 +56,36 @@ async def play_slots(user_id, bet):
     else:
         return 0, f"🎰 | 🎰 | 🎰\n😔 Вы проиграли {bet} {COIN_NAME}."
 
-# ==================== ИГРА 2: РУЛЕТКА ====================
+# ИГРА 2: КУБИК
+async def play_dice(user_id, bet, choice):
+    user = await get_user(user_id)
+    if bet <= 0:
+        return 0, "❌ Ставка должна быть больше 0!"
+    if user["pac_balance"] < bet:
+        return 0, "❌ Недостаточно PAC!"
+    
+    dice = random.randint(1, 6)
+    chance = await get_win_chance(user_id)
+    is_win = random.random() < chance and choice == dice
+    
+    if is_win:
+        win = int(bet * 5)
+        await apply_win_reduction(user_id, True)
+    else:
+        win = 0
+        await apply_win_reduction(user_id, False)
+    
+    await update_user(user_id, pac_balance=user["pac_balance"] - bet + win)
+    await add_transaction(user_id, "dice", -bet, f"Ставка {bet}")
+    if win > 0:
+        await add_transaction(user_id, "dice_win", win, "Выигрыш")
+    
+    if win > 0:
+        return win, f"🎲 Выпало: {dice}\n🎉 Вы угадали! +{win} {COIN_NAME}!"
+    else:
+        return 0, f"🎲 Выпало: {dice}\n😔 Вы не угадали. -{bet} {COIN_NAME}."
+
+# ИГРА 3: РУЛЕТКА
 async def play_roulette(user_id, bet, color_choice):
     user = await get_user(user_id)
     if bet <= 0:
@@ -89,65 +116,7 @@ async def play_roulette(user_id, bet, color_choice):
     else:
         return 0, f"🎡 Выпало: {result}\n😔 Вы проиграли {bet} {COIN_NAME}."
 
-# ==================== ИГРА 3: КУБИК ====================
-async def play_dice(user_id, bet, choice):
-    user = await get_user(user_id)
-    if bet <= 0:
-        return 0, "❌ Ставка должна быть больше 0!"
-    if user["pac_balance"] < bet:
-        return 0, "❌ Недостаточно PAC!"
-    
-    dice = random.randint(1, 6)
-    chance = await get_win_chance(user_id)
-    is_win = random.random() < chance and choice == dice
-    
-    if is_win:
-        win = int(bet * 5)
-        await apply_win_reduction(user_id, True)
-    else:
-        win = 0
-        await apply_win_reduction(user_id, False)
-    
-    await update_user(user_id, pac_balance=user["pac_balance"] - bet + win)
-    await add_transaction(user_id, "dice", -bet, f"Ставка {bet}")
-    if win > 0:
-        await add_transaction(user_id, "dice_win", win, "Выигрыш")
-    
-    if win > 0:
-        return win, f"🎲 Выпало: {dice}\n🎉 Вы угадали! +{win} {COIN_NAME}!"
-    else:
-        return 0, f"🎲 Выпало: {dice}\n😔 Вы не угадали. -{bet} {COIN_NAME}."
-
-# ==================== ИГРА 4: МИНЫ ====================
-async def play_mines(user_id, bet, cell):
-    user = await get_user(user_id)
-    if bet <= 0:
-        return 0, "❌ Ставка должна быть больше 0!"
-    if user["pac_balance"] < bet:
-        return 0, "❌ Недостаточно PAC!"
-    
-    mines = random.sample(range(9), 3)
-    chance = await get_win_chance(user_id)
-    is_win = random.random() < chance and cell not in mines
-    
-    if is_win:
-        win = int(bet * 2.5)
-        await apply_win_reduction(user_id, True)
-    else:
-        win = 0
-        await apply_win_reduction(user_id, False)
-    
-    await update_user(user_id, pac_balance=user["pac_balance"] - bet + win)
-    await add_transaction(user_id, "mines", -bet, f"Ставка {bet}")
-    if win > 0:
-        await add_transaction(user_id, "mines_win", win, "Выигрыш")
-    
-    if win > 0:
-        return win, f"💣 **Мина**\n\nВы выбрали ячейку {cell}\n🎉 Вы не наступили на мину! +{win} {COIN_NAME}!"
-    else:
-        return 0, f"💣 **Мина**\n\nВы выбрали ячейку {cell}\n💥 БАХ! Вы проиграли {bet} {COIN_NAME}."
-
-# ==================== ИГРА 5: ОРЁЛ/РЕШКА ====================
+# ИГРА 4: ОРЁЛ/РЕШКА
 async def play_coin(user_id, bet, choice):
     user = await get_user(user_id)
     if bet <= 0:
@@ -176,7 +145,67 @@ async def play_coin(user_id, bet, choice):
     else:
         return 0, f"🪙 Выпал: {result}\n😔 Вы не угадали. -{bet} {COIN_NAME}."
 
-# ==================== ИГРА 6: БЛЭКДЖЕК ====================
+# ИГРА 5: МИНЫ
+async def play_mines(user_id, bet, cell):
+    user = await get_user(user_id)
+    if bet <= 0:
+        return 0, "❌ Ставка должна быть больше 0!"
+    if user["pac_balance"] < bet:
+        return 0, "❌ Недостаточно PAC!"
+    
+    mines = random.sample(range(9), 3)
+    chance = await get_win_chance(user_id)
+    is_win = random.random() < chance and cell not in mines
+    
+    if is_win:
+        win = int(bet * 2.5)
+        await apply_win_reduction(user_id, True)
+    else:
+        win = 0
+        await apply_win_reduction(user_id, False)
+    
+    await update_user(user_id, pac_balance=user["pac_balance"] - bet + win)
+    await add_transaction(user_id, "mines", -bet, f"Ставка {bet}")
+    if win > 0:
+        await add_transaction(user_id, "mines_win", win, "Выигрыш")
+    
+    if win > 0:
+        return win, f"💣 **Мина**\n\nВы выбрали ячейку {cell}\n🎉 Вы не наступили на мину! +{win} {COIN_NAME}!"
+    else:
+        return 0, f"💣 **Мина**\n\nВы выбрали ячейку {cell}\n💥 БАХ! Вы проиграли {bet} {COIN_NAME}."
+
+# ИГРА 6: КОЛЕСО ФОРТУНЫ
+async def play_wheel(user_id, bet):
+    user = await get_user(user_id)
+    if bet <= 0:
+        return 0, "❌ Ставка должна быть больше 0!"
+    if user["pac_balance"] < bet:
+        return 0, "❌ Недостаточно PAC!"
+    
+    segments = [0, 0, 0, 0, 1, 1, 2, 2, 3, 5]
+    result = random.choice(segments)
+    win = bet * result
+    
+    chance = await get_win_chance(user_id)
+    is_win = random.random() < chance and result > 0
+    
+    if is_win:
+        await apply_win_reduction(user_id, True)
+    else:
+        win = 0
+        await apply_win_reduction(user_id, False)
+    
+    await update_user(user_id, pac_balance=user["pac_balance"] - bet + win)
+    await add_transaction(user_id, "wheel", -bet, f"Ставка {bet}")
+    if win > 0:
+        await add_transaction(user_id, "wheel_win", win, "Выигрыш")
+    
+    if win > 0:
+        return win, f"🎡 **Колесо Фортуны**\n\nВыпал множитель x{result}!\n🎉 Вы выиграли {win} {COIN_NAME}!"
+    else:
+        return 0, f"🎡 **Колесо Фортуны**\n\nВыпал 0!\n😔 Вы проиграли {bet} {COIN_NAME}."
+
+# ИГРА 7: БЛЭКДЖЕК
 async def play_blackjack(user_id, bet):
     user = await get_user(user_id)
     if bet <= 0:
@@ -216,40 +245,7 @@ async def play_blackjack(user_id, bet):
     else:
         return 0, f"🃏 **Блэкджек**\n\nВаши карты: {player} = {player_sum}\nКарты дилера: {dealer} = {dealer_sum}\n\n😔 Вы проиграли {bet} {COIN_NAME}."
 
-# ==================== ИГРА 7: КОЛЕСО ФОРТУНЫ ====================
-async def play_wheel(user_id, bet):
-    user = await get_user(user_id)
-    if bet <= 0:
-        return 0, "❌ Ставка должна быть больше 0!"
-    if user["pac_balance"] < bet:
-        return 0, "❌ Недостаточно PAC!"
-    
-    segments = [0, 0, 0, 0, 1, 1, 2, 2, 3, 5, 10]
-    result = random.choice(segments)
-    win = bet * result
-    
-    chance = await get_win_chance(user_id)
-    is_win = random.random() < chance and result > 0
-    
-    if is_win:
-        await apply_win_reduction(user_id, True)
-    else:
-        win = 0
-        await apply_win_reduction(user_id, False)
-    
-    await update_user(user_id, pac_balance=user["pac_balance"] - bet + win)
-    await add_transaction(user_id, "wheel", -bet, f"Ставка {bet}")
-    if win > 0:
-        await add_transaction(user_id, "wheel_win", win, "Выигрыш")
-    
-    if win > 0:
-        return win, f"🎡 **Колесо Фортуны**\n\nВыпал множитель x{result}!\n🎉 Вы выиграли {win} {COIN_NAME}!"
-    else:
-        return 0, f"🎡 **Колесо Фортуны**\n\nВыпал 0!\n😔 Вы проиграли {bet} {COIN_NAME}."
-
-# ==================== НОВЫЕ ИГРЫ ====================
-
-# 8. ПАЛКИ
+# ИГРА 8: ПАЛКИ
 async def play_sticks(user_id, bet, choice):
     user = await get_user(user_id)
     if bet <= 0:
@@ -278,7 +274,7 @@ async def play_sticks(user_id, bet, choice):
     else:
         return 0, f"🥢 **Палки**\n\nВыпало: {sticks}\n😔 Вы не угадали. -{bet} {COIN_NAME}."
 
-# 9. БОЛЬШЕ-МЕНЬШЕ
+# ИГРА 9: БОЛЬШЕ-МЕНЬШЕ
 async def play_high_low(user_id, bet, choice):
     user = await get_user(user_id)
     if bet <= 0:
@@ -311,7 +307,7 @@ async def play_high_low(user_id, bet, choice):
     else:
         return 0, f"📉 **Больше-Меньше**\n\nВыпало: {number}\n😔 Вы проиграли {bet} {COIN_NAME}."
 
-# 10. КЕНО
+# ИГРА 10: КЕНО
 async def play_keno(user_id, bet, choice):
     user = await get_user(user_id)
     if bet <= 0:
@@ -340,7 +336,7 @@ async def play_keno(user_id, bet, choice):
     else:
         return 0, f"🎲 **Кено**\n\nЧисло {choice} не выпало.\n😔 Вы проиграли {bet} {COIN_NAME}."
 
-# 11. БАККАРА
+# ИГРА 11: БАККАРА
 async def play_baccarat(user_id, bet, choice):
     user = await get_user(user_id)
     if bet <= 0:
@@ -376,7 +372,7 @@ async def play_baccarat(user_id, bet, choice):
     else:
         return 0, f"🃏 **Баккара**\n\nИгрок: {player} | Банкир: {banker}\n😔 Вы проиграли {bet} {COIN_NAME}."
 
-# 12. ПОКЕР
+# ИГРА 12: ПОКЕР
 async def play_poker(user_id, bet):
     user = await get_user(user_id)
     if bet <= 0:
@@ -408,7 +404,7 @@ async def play_poker(user_id, bet):
     else:
         return 0, f"🃏 **Покер**\n\nВаша рука: {', '.join(hand)}\n😔 Вы проиграли {bet} {COIN_NAME}."
 
-# 13. КРЭПС
+# ИГРА 13: КРЭПС
 async def play_craps(user_id, bet):
     user = await get_user(user_id)
     if bet <= 0:
@@ -440,7 +436,7 @@ async def play_craps(user_id, bet):
     else:
         return 0, f"🎲 **Крэпс**\n\nКости: {dice1} + {dice2} = {total}\n😔 Вы проиграли {bet} {COIN_NAME}."
 
-# 14. ВИДЕО-ПОКЕР
+# ИГРА 14: ВИДЕО-ПОКЕР
 async def play_video_poker(user_id, bet):
     user = await get_user(user_id)
     if bet <= 0:
@@ -471,7 +467,7 @@ async def play_video_poker(user_id, bet):
     else:
         return 0, f"🎰 **Видео-покер**\n\nВаша рука: {', '.join(hand)}\n😔 Вы проиграли {bet} {COIN_NAME}."
 
-# 15. ЛАККИ 7
+# ИГРА 15: ЛАККИ 7
 async def play_lucky7(user_id, bet):
     user = await get_user(user_id)
     if bet <= 0:
