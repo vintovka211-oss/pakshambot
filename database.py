@@ -105,6 +105,7 @@ async def get_mine_info(user_id):
     last_collect = user.get("mine_last_collect")
     accumulated = user.get("mine_accumulated", 0)
     
+    from config import MINE_LEVELS
     level_data = MINE_LEVELS.get(level, MINE_LEVELS[1])
     
     if last_collect:
@@ -145,6 +146,7 @@ async def upgrade_mine(user_id):
         return False, "❌ Шахта доступна только премиум-пользователям!"
     
     current_level = user.get("mine_level", 1)
+    from config import MINE_LEVELS
     if current_level >= len(MINE_LEVELS):
         return False, "🏆 Максимальный уровень!"
     
