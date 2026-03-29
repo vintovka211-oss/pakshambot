@@ -90,11 +90,14 @@ async def get_mine_info(user_id):
     from config import MINE_LEVELS
     level_data = MINE_LEVELS.get(level, MINE_LEVELS[1])
     
-    if last_collect:
-        last = datetime.fromisoformat(last_collect) if isinstance(last_collect, str) else last_collect
-        hours = (datetime.now() - last).total_seconds() / 3600
-        accumulated += level_data["daily_output"] / 24 * hours
-        accumulated = min(accumulated, level_data["daily_output"] * 3)
+    if not last_collect:
+        await update_user(user_id, mine_last_collect=datetime.now().isoformat())
+        last_collect = datetime.now().isoformat()
+    
+    last = datetime.fromisoformat(last_collect) if isinstance(last_collect, str) else last_collect
+    hours = (datetime.now() - last).total_seconds() / 3600
+    accumulated += level_data["daily_output"] / 24 * hours
+    accumulated = min(accumulated, level_data["daily_output"] * 3)
     
     return {
         "level": level,
@@ -111,7 +114,7 @@ async def collect_mine(user_id):
     if "error" in info:
         return False, info["error"]
     if info["accumulated"] <= 0:
-        return False, "⛏️ В шахте пока ничего не накопилось!"
+        return False, "⛏️ В шахте пока ничего не накопилось! Подождите несколько часов."
     
     user = await get_user(user_id)
     await update_user(user_id, 
@@ -119,7 +122,7 @@ async def collect_mine(user_id):
         mine_accumulated=0,
         mine_last_collect=datetime.now().isoformat()
     )
-    await add_transaction(user_id, "mine", info["accumulated"], "Сбор шахты")
+    await add_transaction(user_id, "mine", info["accumulated"], f"Сбор шахты {info['name']}")
     return True, f"⛏️ Вы собрали {info['accumulated']} PAC из {info['name']}!"
 
 async def upgrade_mine(user_id):
