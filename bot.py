@@ -18,13 +18,10 @@ dp.message.register(confirm_deposit, lambda m: m.text and m.text.startswith("/co
 dp.message.register(admin_process_user_id, AdminStates.waiting_user_id)
 dp.message.register(admin_process_amount, AdminStates.waiting_amount)
 dp.message.register(admin_process_premium, AdminStates.waiting_days)
-dp.message.register(handle_bet, GameStates.waiting_bet)
-dp.message.register(handle_donate_amount, DonateStates.waiting_amount)
-dp.message.register(handle_withdraw_amount, WithdrawStates.waiting_amount)
 dp.callback_query.register(handle_callback)
 
 async def main():
-    print("🚀 Бот запускается...")
+    print("🚀 Бот запускается с 15 играми!")
     await init_db()
     print("✅ База данных готова")
     await dp.start_polling(bot)
