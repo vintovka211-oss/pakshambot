@@ -1,11 +1,11 @@
 import aiosqlite
+import json
 from datetime import datetime, timedelta
 
 DB_PATH = "w1npaksham.db"
 
 async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:
-        # Пользователи
         await db.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
@@ -26,8 +26,6 @@ async def init_db():
                 clan_id INTEGER DEFAULT 0
             )
         ''')
-        
-        # RPG статистика
         await db.execute('''
             CREATE TABLE IF NOT EXISTS player_stats (
                 user_id INTEGER PRIMARY KEY,
@@ -45,32 +43,97 @@ async def init_db():
                 achievements TEXT DEFAULT '{}'
             )
         ''')
-        
-        # Инвентарь
         await db.execute('''
             CREATE TABLE IF NOT EXISTS inventory (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER,
                 item_type TEXT,
-                item_id INTEGER,
+                item_id TEXT,
                 quantity INTEGER DEFAULT 1,
-                durability INTEGER DEFAULT 100,
-                FOREIGN KEY (user_id) REFERENCES users(user_id)
+                durability INTEGER DEFAULT 100
             )
         ''')
-        
-        # Артефакты (экипированные)
         await db.execute('''
             CREATE TABLE IF NOT EXISTS artifacts (
                 user_id INTEGER,
                 artifact_id INTEGER,
-                PRIMARY KEY (user_id, artifact_id),
-                FOREIGN KEY (user_id) REFERENCES users(user_id)
+                PRIMARY KEY (user_id, artifact_id)
             )
         ''')
-        
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS clans (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE,
+                leader_id INTEGER,
+                members TEXT DEFAULT '[]',
+                balance INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS pvp_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                from_id INTEGER,
+                to_id INTEGER,
+                bet INTEGER,
+                status TEXT DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS marketplace (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                seller_id INTEGER,
+                item_type TEXT,
+                item_id TEXT,
+                quantity INTEGER,
+                price INTEGER,
+                status TEXT DEFAULT 'active'
+            )
+        ''')
         await db.commit()
         print("✅ База данных инициализирована")
 
-# Остальные функции database.py (get_user, update_user, add_transaction, get_top_users)
-# будут добавлены в следующем сообщении из-за ограничения длины
+async def get_user(user_id):
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)) as cursor:
+            user = await cursor.fetchone()
+            if not user:
+                await db.execute("INSERT INTO users (user_id) VALUES (?)", (user_id,))
+                await db.commit()
+                async with db.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)) as cursor2:
+                    user = await cursor2.fetchone()
+            columns = [description[0] for description in cursor.description]
+            return dict(zip(columns, user))
+
+async def update_user(user_id, **kwargs):
+    async with aiosqlite.connect(DB_PATH) as db:
+        for key, value in kwargs.items():
+            await db.execute(f"UPDATE users SET {key} = ? WHERE user_id = ?", (value, user_id))
+        await db.commit()
+
+async def add_transaction(user_id, type, amount, description=""):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT INTO transactions (user_id, type, amount, description) VALUES (?, ?, ?, ?)",
+            (user_id, type, amount, description)
+        )
+        await db.commit()
+
+async def get_player_stats(user_id):
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("SELECT * FROM player_stats WHERE user_id = ?", (user_id,)) as cursor:
+            stats = await cursor.fetchone()
+            if not stats:
+                await db.execute("INSERT INTO player_stats (user_id) VALUES (?)", (user_id,))
+                await db.commit()
+                async with db.execute("SELECT * FROM player_stats WHERE user_id = ?", (user_id,)) as cursor2:
+                    stats = await cursor2.fetchone()
+            columns = [description[0] for description in cursor.description]
+            return dict(zip(columns, stats))
+
+async def update_player_stats(user_id, **kwargs):
+    async with aiosqlite.connect(DB_PATH) as db:
+        for key, value in kwargs.items():
+            await db.execute(f"UPDATE player_stats SET {key} = ? WHERE user_id = ?", (value, user_id))
+        await db.commit()
