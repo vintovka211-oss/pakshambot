@@ -150,13 +150,22 @@ def get_boss_keyboard():
     kb.inline_keyboard.append([InlineKeyboardButton(text="◀️ Назад", callback_data="rpg_menu")])
     return kb
 
-def get_fight_keyboard(boss_id, player_hp, boss_hp, player_attack, boss_attack):
+def get_fight_keyboard(fight_data):
+    """Клавиатура для боя с боссом"""
+    boss_id = fight_data["boss_id"]
+    player_hp = fight_data["player_hp"]
+    boss_hp = fight_data["boss_hp"]
+    player_attack = fight_data["player_attack"]
+    boss_attack = fight_data["boss_attack"]
+    
+    # Кодируем все данные в callback_data
+    data_str = f"{boss_id}|{player_hp}|{boss_hp}|{player_attack}|{boss_attack}"
+    
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="⚔️ Атаковать", callback_data=f"fight_attack_{boss_id}_{player_hp}_{boss_hp}_{player_attack}_{boss_attack}")],
-        [InlineKeyboardButton(text="🧪 Использовать зелье", callback_data=f"fight_heal_{boss_id}_{player_hp}_{boss_hp}_{player_attack}_{boss_attack}")],
+        [InlineKeyboardButton(text="⚔️ Атаковать", callback_data=f"fight_attack_{data_str}")],
+        [InlineKeyboardButton(text="🧪 Использовать зелье", callback_data=f"fight_heal_{data_str}")],
         [InlineKeyboardButton(text="🏃 Сбежать", callback_data="rpg_menu")],
     ])
-
 def get_shop_keyboard():
     kb = InlineKeyboardMarkup(inline_keyboard=[])
     for wid, weapon in WEAPONS.items():
