@@ -1,5 +1,4 @@
 import aiosqlite
-import json
 from datetime import datetime, timedelta
 
 DB_PATH = "w1npaksham.db"
@@ -22,8 +21,7 @@ async def init_db():
                 consecutive_wins INTEGER DEFAULT 0,
                 mine_level INTEGER DEFAULT 1,
                 mine_last_collect TIMESTAMP,
-                mine_accumulated INTEGER DEFAULT 0,
-                clan_id INTEGER DEFAULT 0
+                mine_accumulated INTEGER DEFAULT 0
             )
         ''')
         await db.execute('''
@@ -39,8 +37,7 @@ async def init_db():
                 armor_upgrade INTEGER DEFAULT 0,
                 kills INTEGER DEFAULT 0,
                 deaths INTEGER DEFAULT 0,
-                tool_level INTEGER DEFAULT 1,
-                achievements TEXT DEFAULT '{}'
+                tool_level INTEGER DEFAULT 1
             )
         ''')
         await db.execute('''
@@ -49,50 +46,10 @@ async def init_db():
                 user_id INTEGER,
                 item_type TEXT,
                 item_id TEXT,
-                quantity INTEGER DEFAULT 1,
-                durability INTEGER DEFAULT 100
-            )
-        ''')
-        await db.execute('''
-            CREATE TABLE IF NOT EXISTS artifacts (
-                user_id INTEGER,
-                artifact_id INTEGER,
-                PRIMARY KEY (user_id, artifact_id)
-            )
-        ''')
-        await db.execute('''
-            CREATE TABLE IF NOT EXISTS clans (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT UNIQUE,
-                leader_id INTEGER,
-                members TEXT DEFAULT '[]',
-                balance INTEGER DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        await db.execute('''
-            CREATE TABLE IF NOT EXISTS pvp_requests (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                from_id INTEGER,
-                to_id INTEGER,
-                bet INTEGER,
-                status TEXT DEFAULT 'pending',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        await db.execute('''
-            CREATE TABLE IF NOT EXISTS marketplace (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                seller_id INTEGER,
-                item_type TEXT,
-                item_id TEXT,
-                quantity INTEGER,
-                price INTEGER,
-                status TEXT DEFAULT 'active'
+                quantity INTEGER DEFAULT 1
             )
         ''')
         await db.commit()
-        print("✅ База данных инициализирована")
 
 async def get_user(user_id):
     async with aiosqlite.connect(DB_PATH) as db:
@@ -137,3 +94,82 @@ async def update_player_stats(user_id, **kwargs):
         for key, value in kwargs.items():
             await db.execute(f"UPDATE player_stats SET {key} = ? WHERE user_id = ?", (value, user_id))
         await db.commit()
+
+# ==================== ШАХТА ====================
+async def get_mine_info(user_id):
+    user = await get_user(user_id)
+    if not user.get("is_premium"):
+        return {"error": "❌ Шахта доступна только премиум-пользователям!"}
+    
+    level = user.get("mine_level", 1)
+    last_collect = user.get("mine_last_collect")
+    accumulated = user.get("mine_accumulated", 0)
+    
+    level_data = MINE_LEVELS.get(level, MINE_LEVELS[1])
+    
+    if last_collect:
+        last = datetime.fromisoformat(last_collect) if isinstance(last_collect, str) else last_collect
+        hours = (datetime.now() - last).total_seconds() / 3600
+        accumulated += level_data["daily_output"] / 24 * hours
+        accumulated = min(accumulated, level_data["daily_output"] * 3)
+    
+    return {
+        "level": level,
+        "name": level_data["name"],
+        "icon": level_data["icon"],
+        "daily_output": level_data["daily_output"],
+        "accumulated": int(accumulated),
+        "upgrade_cost": level_data.get("upgrade_cost"),
+        "max_level": level == len(MINE_LEVELS)
+    }
+
+async def collect_mine(user_id):
+    info = await get_mine_info(user_id)
+    if "error" in info:
+        return False, info["error"]
+    if info["accumulated"] <= 0:
+        return False, "⛏️ В шахте пока ничего не накопилось!"
+    
+    user = await get_user(user_id)
+    await update_user(user_id, 
+        pac_balance=user["pac_balance"] + info["accumulated"],
+        mine_accumulated=0,
+        mine_last_collect=datetime.now().isoformat()
+    )
+    await add_transaction(user_id, "mine", info["accumulated"], f"Сбор шахты")
+    return True, f"⛏️ Вы собрали {info['accumulated']} PAC из шахты!"
+
+async def upgrade_mine(user_id):
+    user = await get_user(user_id)
+    if not user.get("is_premium"):
+        return False, "❌ Шахта доступна только премиум-пользователям!"
+    
+    current_level = user.get("mine_level", 1)
+    if current_level >= len(MINE_LEVELS):
+        return False, "🏆 Максимальный уровень!"
+    
+    next_level_data = MINE_LEVELS[current_level + 1]
+    cost = next_level_data["upgrade_cost"]
+    
+    if user["pac_balance"] < cost:
+        return False, f"❌ Нужно {cost} PAC!"
+    
+    await update_user(user_id, 
+        pac_balance=user["pac_balance"] - cost,
+        mine_level=current_level + 1
+    )
+    await add_transaction(user_id, "mine_upgrade", -cost, f"Улучшение шахты")
+    return True, f"✅ Шахта улучшена до {next_level_data['name']}!"
+
+# ==================== ЕЖЕДНЕВНЫЙ БОНУС ====================
+async def claim_daily_bonus(user_id):
+    user = await get_user(user_id)
+    if user.get("last_daily"):
+        last = datetime.fromisoformat(user["last_daily"]) if isinstance(user["last_daily"], str) else user["last_daily"]
+        if (datetime.now() - last).days < 1:
+            return False, "❌ Бонус уже получен сегодня!"
+    
+    bonus = 15 if user.get("is_premium") else 5
+    await update_user(user_id, pac_balance=user["pac_balance"] + bonus, last_daily=datetime.now().isoformat())
+    await add_transaction(user_id, "daily_bonus", bonus, "Ежедневный бонус")
+    return True, f"✅ Вы получили {bonus} PAC!"
