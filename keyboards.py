@@ -1,5 +1,5 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from config import BET_BUTTONS, MARKETPLACE_ITEMS
+from config import BET_BUTTONS, WEAPONS, ARMORS, POTIONS, BOSSES
 
 def get_main_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -8,13 +8,13 @@ def get_main_keyboard():
         [InlineKeyboardButton(text="💸 Вывод", callback_data="withdraw"),
          InlineKeyboardButton(text="👑 Премиум", callback_data="premium")],
         [InlineKeyboardButton(text="⛏️ Шахта", callback_data="mine"),
-         InlineKeyboardButton(text="📊 Статистика", callback_data="stats")],
-        [InlineKeyboardButton(text="🏆 ТОП-10", callback_data="top"),
-         InlineKeyboardButton(text="❓ Помощь", callback_data="help")],
+         InlineKeyboardButton(text="⚔️ RPG режим", callback_data="rpg_menu")],
+        [InlineKeyboardButton(text="🏪 Магазин", callback_data="shop"),
+         InlineKeyboardButton(text="🏆 ТОП-10", callback_data="top")],
+        [InlineKeyboardButton(text="❓ Помощь", callback_data="help"),
+         InlineKeyboardButton(text="🛡️ Админ панель", callback_data="admin_panel")],
         [InlineKeyboardButton(text="👥 Рефералы", callback_data="referral"),
          InlineKeyboardButton(text="🎁 Ежедневный", callback_data="daily")],
-        [InlineKeyboardButton(text="🛒 Маркетплейс", callback_data="marketplace"),
-         InlineKeyboardButton(text="🛡️ Админ панель", callback_data="admin_panel")],
     ])
 
 def get_games_keyboard():
@@ -131,19 +131,36 @@ def get_baccarat_choice_keyboard(bet):
         [InlineKeyboardButton(text="◀️ Назад", callback_data="games")]
     ])
 
-def get_marketplace_keyboard():
-    buttons = []
-    for item_id, item in MARKETPLACE_ITEMS.items():
-        buttons.append([InlineKeyboardButton(text=f"{item['emoji']} {item['name']} - {item['price']} PAC", callback_data=f"buy_{item_id}")])
-    buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")])
-    return InlineKeyboardMarkup(inline_keyboard=buttons)
-
-def get_payment_keyboard():
+def get_rpg_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💳 СБП (по номеру телефона)", callback_data="pay_sbp")],
-        [InlineKeyboardButton(text="🪙 CryptoBot (криптовалюта)", callback_data="pay_crypto")],
-        [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]
+        [InlineKeyboardButton(text="⚔️ Сразиться с боссом", callback_data="fight_boss")],
+        [InlineKeyboardButton(text="⛏️ Пойти в пещеру", callback_data="cave")],
+        [InlineKeyboardButton(text="🗡️ Кузнец", callback_data="forge")],
+        [InlineKeyboardButton(text="🛡️ Мой инвентарь", callback_data="my_inventory")],
+        [InlineKeyboardButton(text="📊 Мои характеристики", callback_data="my_stats_rpg")],
+        [InlineKeyboardButton(text="❤️ Использовать зелье", callback_data="use_potion")],
+        [InlineKeyboardButton(text="🎁 Лутбокс", callback_data="lottery_box")],
+        [InlineKeyboardButton(text="🔄 Обменять RPG на PAC", callback_data="exchange_rpg")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")],
     ])
+
+def get_boss_keyboard():
+    kb = InlineKeyboardMarkup(inline_keyboard=[])
+    for bid, boss in BOSSES.items():
+        kb.inline_keyboard.append([InlineKeyboardButton(text=f"{boss['icon']} {boss['name']} (HP: {boss['hp']})", callback_data=f"boss_{bid}")])
+    kb.inline_keyboard.append([InlineKeyboardButton(text="◀️ Назад", callback_data="rpg_menu")])
+    return kb
+
+def get_shop_keyboard():
+    kb = InlineKeyboardMarkup(inline_keyboard=[])
+    for wid, weapon in WEAPONS.items():
+        kb.inline_keyboard.append([InlineKeyboardButton(text=f"{weapon['icon']} {weapon['name']} - {weapon['price']} 🪙", callback_data=f"buy_weapon_{wid}")])
+    for aid, armor in ARMORS.items():
+        kb.inline_keyboard.append([InlineKeyboardButton(text=f"{armor['icon']} {armor['name']} - {armor['price']} 🪙", callback_data=f"buy_armor_{aid}")])
+    for pid, potion in POTIONS.items():
+        kb.inline_keyboard.append([InlineKeyboardButton(text=f"{potion['icon']} {potion['name']} - {potion['price']} 🪙", callback_data=f"buy_potion_{pid}")])
+    kb.inline_keyboard.append([InlineKeyboardButton(text="◀️ Назад", callback_data="rpg_menu")])
+    return kb
 
 def get_back_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -153,6 +170,7 @@ def get_back_keyboard():
 def get_admin_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💰 Выдать PAC", callback_data="admin_give_pac")],
+        [InlineKeyboardButton(text="🪙 Выдать RPG", callback_data="admin_give_rpg")],
         [InlineKeyboardButton(text="👑 Выдать премиум", callback_data="admin_give_premium")],
         [InlineKeyboardButton(text="🎁 Выдать бонус", callback_data="admin_give_bonus")],
         [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")],
