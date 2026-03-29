@@ -40,7 +40,7 @@ def get_games_keyboard():
 def get_bet_keyboard(game):
     buttons = []
     row = []
-    for i, bet in enumerate(BET_BUTTONS):
+    for bet in BET_BUTTONS:
         row.append(InlineKeyboardButton(text=f"{bet}", callback_data=f"{game}_bet_{bet}"))
         if len(row) == 4:
             buttons.append(row)
@@ -49,13 +49,6 @@ def get_bet_keyboard(game):
         buttons.append(row)
     buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="games")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
-
-def get_roulette_choice_keyboard(bet):
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔴 Красное", callback_data=f"roulette_choice_🔴_{bet}"),
-         InlineKeyboardButton(text="⚫ Чёрное", callback_data=f"roulette_choice_⚫_{bet}")],
-        [InlineKeyboardButton(text="◀️ Назад", callback_data="games")]
-    ])
 
 def get_dice_choice_keyboard(bet):
     buttons = []
@@ -69,6 +62,13 @@ def get_dice_choice_keyboard(bet):
         buttons.append(row)
     buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="games")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def get_roulette_choice_keyboard(bet):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔴 Красное", callback_data=f"roulette_choice_🔴_{bet}"),
+         InlineKeyboardButton(text="⚫ Чёрное", callback_data=f"roulette_choice_⚫_{bet}")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="games")]
+    ])
 
 def get_coin_choice_keyboard(bet):
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -113,13 +113,13 @@ def get_highlow_choice_keyboard(bet):
 def get_keno_choice_keyboard(bet):
     buttons = []
     row = []
-    for i in range(1, 81):
+    for i in range(1, 21):
         row.append(InlineKeyboardButton(text=str(i), callback_data=f"keno_choice_{i}_{bet}"))
-        if len(row) == 10:
+        if len(row) == 5:
             buttons.append(row)
             row = []
-        if len(buttons) >= 8:
-            break
+    if row:
+        buttons.append(row)
     buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="games")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
