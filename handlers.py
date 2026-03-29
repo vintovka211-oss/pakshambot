@@ -116,7 +116,7 @@ async def start_command(message: types.Message):
     user_id = message.from_user.id
     user = await get_user(user_id)
     
-    if user.get("pac_balance", 0) == 5:
+    if user.get("pac_balance", 0) == 100:
         await update_user(user_id, pac_balance=BONUS_PAC, username=message.from_user.username or str(user_id))
         await message.answer(
             f"🎉 **Добро пожаловать в W1NPAKSHAM!**\n\n"
@@ -173,11 +173,10 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
     elif data == "games":
         await callback.message.edit_text("🎮 **Выберите игру (15 игр):**", reply_markup=get_games_keyboard(), parse_mode="Markdown")
     
-    # УНИВЕРСАЛЬНЫЙ ОБРАБОТЧИК СТАВОК ДЛЯ ВСЕХ ИГР
-    elif data.endswith("_bet_"):
-        parts = data.split("_")
-        game = parts[0]
-        bet = int(parts[2])
+    # УНИВЕРСАЛЬНЫЙ ОБРАБОТЧИК СТАВОК
+    elif "_bet_" in data:
+        game = data.split("_")[0]
+        bet = int(data.split("_")[2])
         
         if game == "slots":
             await callback.message.edit_text("🎰 **Слоты**\n\nВыберите ставку:", reply_markup=get_bet_keyboard("slots"))
@@ -191,12 +190,14 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
             await callback.message.edit_text(f"💣 **Мины**\n\nСтавка: {bet} {COIN_NAME}\n\nВыберите ячейку (1-9):", reply_markup=get_mines_choice_keyboard(bet), parse_mode="Markdown")
         elif game == "wheel":
             win, result = await play_wheel(user_id, bet)
-            await callback.message.edit_text(f"{result}\n\n💎 Баланс: {(await get_user(user_id))['pac_balance']} {COIN_NAME}", reply_markup=get_games_keyboard(), parse_mode="Markdown")
+            user = await get_user(user_id)
+            await callback.message.edit_text(f"{result}\n\n💎 Баланс: {user['pac_balance']} {COIN_NAME}", reply_markup=get_games_keyboard(), parse_mode="Markdown")
             if win > 0:
                 await show_animation(callback.message, win)
         elif game == "blackjack":
             win, result = await play_blackjack(user_id, bet)
-            await callback.message.edit_text(f"{result}\n\n💎 Баланс: {(await get_user(user_id))['pac_balance']} {COIN_NAME}", reply_markup=get_games_keyboard(), parse_mode="Markdown")
+            user = await get_user(user_id)
+            await callback.message.edit_text(f"{result}\n\n💎 Баланс: {user['pac_balance']} {COIN_NAME}", reply_markup=get_games_keyboard(), parse_mode="Markdown")
             if win > 0:
                 await show_animation(callback.message, win)
         elif game == "sticks":
@@ -204,88 +205,108 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
         elif game == "highlow":
             await callback.message.edit_text(f"📈 **Больше-Меньше**\n\nСтавка: {bet} {COIN_NAME}\n\nВыберите:", reply_markup=get_highlow_choice_keyboard(bet), parse_mode="Markdown")
         elif game == "keno":
-            await callback.message.edit_text(f"🎲 **Кено**\n\nСтавка: {bet} {COIN_NAME}\n\nВыберите число (1-80):", reply_markup=get_keno_choice_keyboard(bet), parse_mode="Markdown")
+            await callback.message.edit_text(f"🎲 **Кено**\n\nСтавка: {bet} {COIN_NAME}\n\nВыберите число (1-20):", reply_markup=get_keno_choice_keyboard(bet), parse_mode="Markdown")
         elif game == "baccarat":
             await callback.message.edit_text(f"🃏 **Баккара**\n\nСтавка: {bet} {COIN_NAME}\n\nВыберите:", reply_markup=get_baccarat_choice_keyboard(bet), parse_mode="Markdown")
         elif game == "poker":
             win, result = await play_poker(user_id, bet)
-            await callback.message.edit_text(f"{result}\n\n💎 Баланс: {(await get_user(user_id))['pac_balance']} {COIN_NAME}", reply_markup=get_games_keyboard(), parse_mode="Markdown")
+            user = await get_user(user_id)
+            await callback.message.edit_text(f"{result}\n\n💎 Баланс: {user['pac_balance']} {COIN_NAME}", reply_markup=get_games_keyboard(), parse_mode="Markdown")
             if win > 0:
                 await show_animation(callback.message, win)
         elif game == "craps":
             win, result = await play_craps(user_id, bet)
-            await callback.message.edit_text(f"{result}\n\n💎 Баланс: {(await get_user(user_id))['pac_balance']} {COIN_NAME}", reply_markup=get_games_keyboard(), parse_mode="Markdown")
+            user = await get_user(user_id)
+            await callback.message.edit_text(f"{result}\n\n💎 Баланс: {user['pac_balance']} {COIN_NAME}", reply_markup=get_games_keyboard(), parse_mode="Markdown")
             if win > 0:
                 await show_animation(callback.message, win)
         elif game == "video_poker":
             win, result = await play_video_poker(user_id, bet)
-            await callback.message.edit_text(f"{result}\n\n💎 Баланс: {(await get_user(user_id))['pac_balance']} {COIN_NAME}", reply_markup=get_games_keyboard(), parse_mode="Markdown")
+            user = await get_user(user_id)
+            await callback.message.edit_text(f"{result}\n\n💎 Баланс: {user['pac_balance']} {COIN_NAME}", reply_markup=get_games_keyboard(), parse_mode="Markdown")
             if win > 0:
                 await show_animation(callback.message, win)
         elif game == "lucky7":
             win, result = await play_lucky7(user_id, bet)
-            await callback.message.edit_text(f"{result}\n\n💎 Баланс: {(await get_user(user_id))['pac_balance']} {COIN_NAME}", reply_markup=get_games_keyboard(), parse_mode="Markdown")
+            user = await get_user(user_id)
+            await callback.message.edit_text(f"{result}\n\n💎 Баланс: {user['pac_balance']} {COIN_NAME}", reply_markup=get_games_keyboard(), parse_mode="Markdown")
             if win > 0:
                 await show_animation(callback.message, win)
     
     # ОБРАБОТЧИКИ ВЫБОРОВ
-    elif "choice" in data:
-        parts = data.split("_")
-        game = parts[0]
+    elif "_choice_" in data:
+        game = data.split("_")[0]
+        
         if game == "roulette":
+            parts = data.split("_")
             color = parts[2]
             bet = int(parts[3])
             win, result = await play_roulette(user_id, bet, color)
-            await callback.message.edit_text(f"{result}\n\n💎 Баланс: {(await get_user(user_id))['pac_balance']} {COIN_NAME}", reply_markup=get_games_keyboard(), parse_mode="Markdown")
+            user = await get_user(user_id)
+            await callback.message.edit_text(f"{result}\n\n💎 Баланс: {user['pac_balance']} {COIN_NAME}", reply_markup=get_games_keyboard(), parse_mode="Markdown")
             if win > 0:
                 await show_animation(callback.message, win)
         elif game == "dice":
+            parts = data.split("_")
             choice = int(parts[2])
             bet = int(parts[3])
             win, result = await play_dice(user_id, bet, choice)
-            await callback.message.edit_text(f"{result}\n\n💎 Баланс: {(await get_user(user_id))['pac_balance']} {COIN_NAME}", reply_markup=get_games_keyboard(), parse_mode="Markdown")
+            user = await get_user(user_id)
+            await callback.message.edit_text(f"{result}\n\n💎 Баланс: {user['pac_balance']} {COIN_NAME}", reply_markup=get_games_keyboard(), parse_mode="Markdown")
             if win > 0:
                 await show_animation(callback.message, win)
         elif game == "coin":
+            parts = data.split("_")
             choice = parts[2]
             bet = int(parts[3])
             win, result = await play_coin(user_id, bet, choice)
-            await callback.message.edit_text(f"{result}\n\n💎 Баланс: {(await get_user(user_id))['pac_balance']} {COIN_NAME}", reply_markup=get_games_keyboard(), parse_mode="Markdown")
+            user = await get_user(user_id)
+            await callback.message.edit_text(f"{result}\n\n💎 Баланс: {user['pac_balance']} {COIN_NAME}", reply_markup=get_games_keyboard(), parse_mode="Markdown")
             if win > 0:
                 await show_animation(callback.message, win)
         elif game == "mines":
+            parts = data.split("_")
             cell = int(parts[2])
             bet = int(parts[3])
             win, result = await play_mines(user_id, bet, cell)
-            await callback.message.edit_text(f"{result}\n\n💎 Баланс: {(await get_user(user_id))['pac_balance']} {COIN_NAME}", reply_markup=get_games_keyboard(), parse_mode="Markdown")
+            user = await get_user(user_id)
+            await callback.message.edit_text(f"{result}\n\n💎 Баланс: {user['pac_balance']} {COIN_NAME}", reply_markup=get_games_keyboard(), parse_mode="Markdown")
             if win > 0:
                 await show_animation(callback.message, win)
         elif game == "sticks":
+            parts = data.split("_")
             choice = int(parts[2])
             bet = int(parts[3])
             win, result = await play_sticks(user_id, bet, choice)
-            await callback.message.edit_text(f"{result}\n\n💎 Баланс: {(await get_user(user_id))['pac_balance']} {COIN_NAME}", reply_markup=get_games_keyboard(), parse_mode="Markdown")
+            user = await get_user(user_id)
+            await callback.message.edit_text(f"{result}\n\n💎 Баланс: {user['pac_balance']} {COIN_NAME}", reply_markup=get_games_keyboard(), parse_mode="Markdown")
             if win > 0:
                 await show_animation(callback.message, win)
         elif game == "highlow":
+            parts = data.split("_")
             choice = parts[2]
             bet = int(parts[3])
             win, result = await play_high_low(user_id, bet, choice)
-            await callback.message.edit_text(f"{result}\n\n💎 Баланс: {(await get_user(user_id))['pac_balance']} {COIN_NAME}", reply_markup=get_games_keyboard(), parse_mode="Markdown")
+            user = await get_user(user_id)
+            await callback.message.edit_text(f"{result}\n\n💎 Баланс: {user['pac_balance']} {COIN_NAME}", reply_markup=get_games_keyboard(), parse_mode="Markdown")
             if win > 0:
                 await show_animation(callback.message, win)
         elif game == "keno":
+            parts = data.split("_")
             choice = int(parts[2])
             bet = int(parts[3])
             win, result = await play_keno(user_id, bet, choice)
-            await callback.message.edit_text(f"{result}\n\n💎 Баланс: {(await get_user(user_id))['pac_balance']} {COIN_NAME}", reply_markup=get_games_keyboard(), parse_mode="Markdown")
+            user = await get_user(user_id)
+            await callback.message.edit_text(f"{result}\n\n💎 Баланс: {user['pac_balance']} {COIN_NAME}", reply_markup=get_games_keyboard(), parse_mode="Markdown")
             if win > 0:
                 await show_animation(callback.message, win)
         elif game == "baccarat":
+            parts = data.split("_")
             choice = parts[2]
             bet = int(parts[3])
             win, result = await play_baccarat(user_id, bet, choice)
-            await callback.message.edit_text(f"{result}\n\n💎 Баланс: {(await get_user(user_id))['pac_balance']} {COIN_NAME}", reply_markup=get_games_keyboard(), parse_mode="Markdown")
+            user = await get_user(user_id)
+            await callback.message.edit_text(f"{result}\n\n💎 Баланс: {user['pac_balance']} {COIN_NAME}", reply_markup=get_games_keyboard(), parse_mode="Markdown")
             if win > 0:
                 await show_animation(callback.message, win)
     
@@ -327,20 +348,36 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
         user = await get_user(user_id)
         if user.get("is_premium"):
             await callback.message.edit_text(
-                f"👑 **Премиум статус**\n\nАктивен до: {user['premium_until']}",
+                f"👑 **У вас есть премиум!**\n\nАктивен до: {user['premium_until']}",
                 reply_markup=get_back_keyboard(),
                 parse_mode="Markdown"
             )
         else:
+            from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+            kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text=f"💎 Купить за {PREMIUM_PRICE_PAC} PAC", callback_data="buy_premium")],
+                [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]
+            ])
             await callback.message.edit_text(
                 f"👑 **Премиум подписка**\n\n"
                 f"💰 Стоимость: {PREMIUM_PRICE_PAC} {COIN_NAME}\n\n"
                 f"✨ **Преимущества:**\n"
                 f"• ⛏️ Шахта (до 250 PAC/день)\n"
-                f"• +15 PAC/день бонус\n"
-                f"• Улучшенные множители в играх\n\n"
-                f"Купить за {COIN_NAME}? Напишите /premium",
-                reply_markup=get_back_keyboard(),
+                f"• +15 PAC/день бонус\n\n"
+                f"Купить подписку?",
+                reply_markup=kb,
+                parse_mode="Markdown"
+            )
+    
+    elif data == "buy_premium":
+        success, msg = await buy_premium(user_id)
+        await callback.answer(msg, show_alert=True)
+        if success:
+            user = await get_user(user_id)
+            await callback.message.edit_text(
+                f"👑 **Премиум активирован!**\n\n"
+                f"💎 Баланс: {user['pac_balance']} {COIN_NAME}",
+                reply_markup=get_main_keyboard(),
                 parse_mode="Markdown"
             )
     
@@ -350,7 +387,6 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
         if "error" in info:
             await callback.message.edit_text(info["error"], reply_markup=get_back_keyboard())
         else:
-            from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
             kb = InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="⛏️ Собрать", callback_data="mine_collect")],
             ])
@@ -463,6 +499,7 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
             user = await get_user(user_id)
             if user["pac_balance"] >= item["price"]:
                 await update_user(user_id, pac_balance=user["pac_balance"] - item["price"])
+                await add_transaction(user_id, "marketplace", -item["price"], f"Покупка {item['name']}")
                 await callback.answer(f"✅ Вы купили {item['name']}!", show_alert=True)
                 await callback.message.edit_text(
                     f"🎉 **Поздравляем!**\n\nВы купили {item['emoji']} {item['name']}\n\n{item['description']}",
