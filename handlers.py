@@ -5,6 +5,7 @@ from aiogram.fsm.state import State, StatesGroup
 from datetime import datetime, timedelta
 import asyncio
 import random
+import aiosqlite
 
 from config import *
 from database import *
@@ -12,7 +13,6 @@ from keyboards import *
 from games import *
 from rpg import *
 
-# ==================== СОСТОЯНИЯ ====================
 class AdminStates(StatesGroup):
     waiting_user_id = State()
     waiting_amount = State()
@@ -162,7 +162,35 @@ async def start_command(message: types.Message):
             parse_mode="Markdown"
         )
 
-# ==================== ГЛАВНЫЙ ОБРАБОТЧИК ====================
+# ==================== ПРИВЕТСТВИЕ В ЧАТЕ ====================
+async def welcome_new_member(message: types.Message):
+    for member in message.new_chat_members:
+        if member.id == (await message.bot.me()).id:
+            await message.answer(
+                f"🎉 **Привет! Я W1NPAKSHAM Bot!** 🎉\n\n"
+                f"💰 **Мои возможности:**\n"
+                f"• 🎮 15 азартных игр\n"
+                f"• ⚔️ RPG режим с боссами и прокачкой\n"
+                f"• ⛏️ Шахта для пассивного дохода\n"
+                f"• 💰 Вывод средств на карту\n\n"
+                f"📱 **Играй прямо сейчас:** @W1NPakshamNewBot\n"
+                f"📞 По вопросам: @ZOJlOTOY",
+                parse_mode="Markdown"
+            )
+        else:
+            await message.answer(
+                f"🎉 **Добро пожаловать, {member.first_name}!** 🎉\n\n"
+                f"🔥 Здесь ты найдёшь:\n"
+                f"• 🎮 Азартные игры с выводом средств\n"
+                f"• ⚔️ RPG режим с боссами\n"
+                f"• ⛏️ Шахту для пассивного дохода\n\n"
+                f"💎 **Начать игру:** @W1NPakshamNewBot\n"
+                f"💰 **Бонус 100 PAC за регистрацию!**\n\n"
+                f"👋 Приятной игры!",
+                parse_mode="Markdown"
+            )
+
+# ==================== ОСНОВНОЙ ОБРАБОТЧИК ====================
 async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
     user_id = callback.from_user.id
     data = callback.data
@@ -199,7 +227,189 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
             parse_mode="Markdown"
         )
     
-    # ==================== ИГРЫ (КАЗИНО) ====================
+    # ПОПОЛНЕНИЕ
+    elif data == "deposit":
+        await callback.message.edit_text(
+            f"💎 **Пополнение {COIN_NAME}**\n\n"
+            f"💰 1 {COIN_NAME} = 0.8₽\n"
+            f"⚡ Минимальная покупка: 10 {COIN_NAME} (8₽)\n\n"
+            f"💳 **Оплата через СБП**\n"
+            f"📱 Номер телефона: `{SBP_PHONE}`\n\n"
+            f"После оплаты напишите /confirm_сумма",
+            reply_markup=get_back_keyboard(),
+            parse_mode="Markdown"
+        )
+    
+    # ВЫВОД
+    elif data == "withdraw":
+        await callback.answer("⏸️ Вывод временно недоступен.", show_alert=True)
+    
+    # ПРЕМИУМ
+    elif data == "premium":
+        user = await get_user(user_id)
+        if user.get("is_premium"):
+            await callback.message.edit_text(
+                f"👑 **У вас есть премиум!**\n\nАктивен до: {user['premium_until']}",
+                reply_markup=get_back_keyboard(),
+                parse_mode="Markdown"
+            )
+        else:
+            kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text=f"💎 Купить за {PREMIUM_PRICE_PAC} PAC", callback_data="buy_premium")],
+                [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]
+            ])
+            await callback.message.edit_text(
+                f"👑 **Премиум подписка**\n\n"
+                f"💰 Стоимость: {PREMIUM_PRICE_PAC} {COIN_NAME}\n\n"
+                f"✨ **Преимущества:**\n"
+                f"• ⛏️ Шахта (до 250 PAC/день)\n"
+                f"• +15 PAC/день бонус\n\n"
+                f"Купить подписку?",
+                reply_markup=kb,
+                parse_mode="Markdown"
+            )
+    
+    elif data == "buy_premium":
+        user = await get_user(user_id)
+        if user["pac_balance"] >= PREMIUM_PRICE_PAC:
+            await update_user(user_id, 
+                pac_balance=user["pac_balance"] - PREMIUM_PRICE_PAC,
+                is_premium=1,
+                premium_until=(datetime.now() + timedelta(days=30)).isoformat()
+            )
+            await add_transaction(user_id, "premium", -PREMIUM_PRICE_PAC, "Премиум подписка")
+            await callback.answer("✅ Премиум активирован на 30 дней!", show_alert=True)
+            user = await get_user(user_id)
+            stats = await get_player_stats(user_id)
+            await callback.message.edit_text(
+                f"🎮 **Главное меню**\n\n"
+                f"👤 ID: {user_id}\n"
+                f"💎 {COIN_NAME}: {user['pac_balance']}\n"
+                f"🪙 {RPG_COIN_NAME}: {user['rpg_balance']}\n"
+                f"❤️ HP: {stats['hp']}/{stats['max_hp']}",
+                reply_markup=get_main_keyboard(),
+                parse_mode="Markdown"
+            )
+        else:
+            await callback.answer(f"❌ Недостаточно {COIN_NAME}!", show_alert=True)
+    
+    # ШАХТА
+    elif data == "mine":
+        info = await get_mine_info(user_id)
+        if "error" in info:
+            await callback.message.edit_text(info["error"], reply_markup=get_back_keyboard(), parse_mode="Markdown")
+        else:
+            kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="⛏️ Собрать", callback_data="mine_collect")],
+                [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]
+            ])
+            if not info["max_level"]:
+                kb.inline_keyboard.insert(0, [InlineKeyboardButton(text=f"⬆️ Улучшить ({info['upgrade_cost']} PAC)", callback_data="mine_upgrade")])
+            await callback.message.edit_text(
+                f"⛏️ **Шахта**\n\n"
+                f"📊 Уровень: {info['level']}/7\n"
+                f"⚡ Добыча: {info['daily_output']} PAC/день\n"
+                f"📦 Накоплено: {info['accumulated']} PAC\n\n"
+                f"💡 Шахта копит PAC до 3 дней!",
+                reply_markup=kb,
+                parse_mode="Markdown"
+            )
+    
+    elif data == "mine_collect":
+        success, msg = await collect_mine(user_id)
+        await callback.answer(msg, show_alert=True)
+        if success:
+            info = await get_mine_info(user_id)
+            await callback.message.edit_text(
+                f"⛏️ **Шахта**\n\n"
+                f"📊 Уровень: {info['level']}/7\n"
+                f"⚡ Добыча: {info['daily_output']} PAC/день\n"
+                f"📦 Накоплено: {info['accumulated']} PAC",
+                reply_markup=get_back_keyboard(),
+                parse_mode="Markdown"
+            )
+    
+    elif data == "mine_upgrade":
+        success, msg = await upgrade_mine(user_id)
+        await callback.answer(msg, show_alert=True)
+    
+    # ЕЖЕДНЕВНЫЙ БОНУС
+    elif data == "daily":
+        success, msg = await claim_daily_bonus(user_id)
+        await callback.answer(msg, show_alert=True)
+        if success:
+            user = await get_user(user_id)
+            stats = await get_player_stats(user_id)
+            await callback.message.edit_text(
+                f"🎮 **Главное меню**\n\n"
+                f"👤 ID: {user_id}\n"
+                f"💎 {COIN_NAME}: {user['pac_balance']}\n"
+                f"🪙 {RPG_COIN_NAME}: {user['rpg_balance']}\n"
+                f"❤️ HP: {stats['hp']}/{stats['max_hp']}",
+                reply_markup=get_main_keyboard(),
+                parse_mode="Markdown"
+            )
+    
+    # РЕФЕРАЛЫ
+    elif data == "referral":
+        user = await get_user(user_id)
+        ref_link = f"https://t.me/W1NPakshamNewBot?start={user_id}"
+        await callback.message.edit_text(
+            f"👥 **Реферальная система**\n\n"
+            f"💰 За друга: +5 {COIN_NAME}\n"
+            f"👥 Ваших: {user['referrals']}\n"
+            f"🔗 Ссылка:\n`{ref_link}`",
+            reply_markup=get_back_keyboard(),
+            parse_mode="Markdown"
+        )
+    
+    # ПОМОЩЬ
+    elif data == "help":
+        text = (
+            "❓ **Помощь**\n\n"
+            "🎮 **Казино:** 15 игр на выбор\n"
+            "⚔️ **RPG режим:**\n"
+            "• Сражайся с 10 боссами\n"
+            "• Добывай ресурсы в пещерах\n"
+            "• Улучшай оружие и броню у кузнеца\n"
+            "• Покупай предметы в магазине\n\n"
+            "🔄 100 {RPG_COIN_NAME} = 1 {COIN_NAME}\n"
+            "👑 Премиум даёт шахту и бонусы\n\n"
+            "📞 По вопросам: @ZOJlOTOY"
+        )
+        await callback.message.edit_text(text, reply_markup=get_back_keyboard(), parse_mode="Markdown")
+    
+    # ТОП-10
+    elif data == "top":
+        async with aiosqlite.connect(DB_PATH) as db:
+            async with db.execute("SELECT user_id, username, kills FROM player_stats ORDER BY kills DESC LIMIT 10") as cursor:
+                top_kills = await cursor.fetchall()
+        text = "🏆 **ТОП-10 по убийствам боссов:**\n\n"
+        for i, (uid, name, kills) in enumerate(top_kills, 1):
+            text += f"{i}. {name or uid} — {kills} убийств\n"
+        await callback.message.edit_text(text, reply_markup=get_back_keyboard(), parse_mode="Markdown")
+    
+    # СТАТИСТИКА
+    elif data == "stats":
+        user = await get_user(user_id)
+        stats = await get_player_stats(user_id)
+        await callback.message.edit_text(
+            f"📊 **Ваша статистика**\n\n"
+            f"👤 ID: {user_id}\n"
+            f"💎 {COIN_NAME}: {user['pac_balance']}\n"
+            f"🪙 {RPG_COIN_NAME}: {user['rpg_balance']}\n"
+            f"🎮 Игр: {user['total_games']}\n"
+            f"🔄 Оборот: {user['turnover']} {COIN_NAME}\n"
+            f"👥 Рефералов: {user['referrals']}\n"
+            f"👑 Премиум: {'✅' if user['is_premium'] else '❌'}\n"
+            f"⭐ Уровень: {stats['level']}\n"
+            f"💀 Побед: {stats['kills']}\n"
+            f"⚰️ Поражений: {stats['deaths']}",
+            reply_markup=get_back_keyboard(),
+            parse_mode="Markdown"
+        )
+    
+    # ==================== ИГРЫ ====================
     elif data == "games":
         await callback.message.edit_text("🎮 **Выберите игру:**", reply_markup=get_games_keyboard(), parse_mode="Markdown")
     
@@ -432,15 +642,51 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
     
     elif data.startswith("boss_"):
         boss_id = int(data.split("_")[1])
-        success, result = await fight_boss(user_id, boss_id, callback.message)
-        if "Победа" in result or "Поражение" in result:
-            await callback.message.edit_text(result[:3000], reply_markup=get_rpg_keyboard(), parse_mode="Markdown")
-        else:
-            await callback.answer(result[:200], show_alert=True)
+        await fight_boss_start(user_id, boss_id, callback.message)
+    
+    elif data.startswith("fight_attack_"):
+        parts = data.split("_")
+        boss_id = int(parts[2])
+        player_hp = int(parts[3])
+        boss_hp = int(parts[4])
+        player_attack = int(parts[5])
+        boss_attack = int(parts[6])
+        result, status = await fight_attack(user_id, boss_id, player_hp, boss_hp, player_attack, boss_attack, callback.message)
+        if status == "win":
+            user = await get_user(user_id)
+            stats = await get_player_stats(user_id)
+            await callback.message.edit_text(
+                f"⚔️ **RPG РАЗДЕЛ** ⚔️\n\n"
+                f"📊 Уровень: {stats['level']}\n"
+                f"❤️ HP: {stats['hp']}/{stats['max_hp']}\n"
+                f"🪙 {RPG_COIN_NAME}: {user['rpg_balance']}\n\n"
+                f"Выберите действие:",
+                reply_markup=get_rpg_keyboard(),
+                parse_mode="Markdown"
+            )
+        elif status == "lose":
+            user = await get_user(user_id)
+            stats = await get_player_stats(user_id)
+            await callback.message.edit_text(
+                f"⚔️ **RPG РАЗДЕЛ** ⚔️\n\n"
+                f"❤️ HP: {stats['hp']}/{stats['max_hp']}\n\n"
+                f"Выберите действие:",
+                reply_markup=get_rpg_keyboard(),
+                parse_mode="Markdown"
+            )
+    
+    elif data.startswith("fight_heal_"):
+        parts = data.split("_")
+        boss_id = int(parts[2])
+        player_hp = int(parts[3])
+        boss_hp = int(parts[4])
+        player_attack = int(parts[5])
+        boss_attack = int(parts[6])
+        new_hp = await heal_in_fight(user_id, callback.message, boss_id, player_hp, boss_hp, player_attack, boss_attack)
     
     # ПЕЩЕРА
     elif data == "cave":
-        success, result = await go_to_cave(user_id, callback.message)
+        success, result = await go_to_cave(user_id)
         await callback.answer(result[:200], show_alert=True)
         if success:
             stats = await get_player_stats(user_id)
@@ -471,39 +717,11 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
     
     elif data == "upgrade_weapon":
         success, result = await upgrade_weapon(user_id)
-        await callback.answer(result[:200], show_alert=True)
-        if success:
-            stats = await get_player_stats(user_id)
-            await callback.message.edit_text(
-                f"🔨 **Кузнец**\n\n"
-                f"🗡️ Оружие: +{stats['weapon_upgrade']}\n"
-                f"🛡️ Броня: +{stats['armor_upgrade']}\n\n"
-                f"Выберите действие:",
-                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="🗡️ Улучшить оружие", callback_data="upgrade_weapon")],
-                    [InlineKeyboardButton(text="🛡️ Улучшить броню", callback_data="upgrade_armor")],
-                    [InlineKeyboardButton(text="◀️ Назад", callback_data="rpg_menu")]
-                ]),
-                parse_mode="Markdown"
-            )
+        await callback.answer(result, show_alert=True)
     
     elif data == "upgrade_armor":
         success, result = await upgrade_armor(user_id)
-        await callback.answer(result[:200], show_alert=True)
-        if success:
-            stats = await get_player_stats(user_id)
-            await callback.message.edit_text(
-                f"🔨 **Кузнец**\n\n"
-                f"🗡️ Оружие: +{stats['weapon_upgrade']}\n"
-                f"🛡️ Броня: +{stats['armor_upgrade']}\n\n"
-                f"Выберите действие:",
-                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="🗡️ Улучшить оружие", callback_data="upgrade_weapon")],
-                    [InlineKeyboardButton(text="🛡️ Улучшить броню", callback_data="upgrade_armor")],
-                    [InlineKeyboardButton(text="◀️ Назад", callback_data="rpg_menu")]
-                ]),
-                parse_mode="Markdown"
-            )
+        await callback.answer(result, show_alert=True)
     
     # МАГАЗИН
     elif data == "shop":
@@ -617,14 +835,14 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
             f"⭐ Уровень: {stats['level']}\n"
             f"📈 Опыт: {stats['exp']}/{stats['level']*100}\n"
             f"❤️ HP: {stats['hp']}/{stats['max_hp']}\n"
-            f"🗡️ Атака: {total_attack} (база 10 + ур. {stats['level']} + оружие {weapon['attack']} + улучшение {stats['weapon_upgrade']*5})\n"
-            f"🛡️ Защита: {total_defense} (ур. {stats['level']} + броня {armor['defense']} + улучшение {stats['armor_upgrade']*3})\n"
-            f"💀 Побед над боссами: {stats['kills']}\n"
+            f"🗡️ Атака: {total_attack}\n"
+            f"🛡️ Защита: {total_defense}\n"
+            f"💀 Побед: {stats['kills']}\n"
             f"⚰️ Поражений: {stats['deaths']}\n"
             f"🪙 {RPG_COIN_NAME}: {user['rpg_balance']}\n\n"
             f"⚔️ **Снаряжение:**\n"
-            f"• Оружие: {weapon['icon']} {weapon['name']} (+{weapon['attack']} атаки) +{stats['weapon_upgrade']}\n"
-            f"• Броня: {armor['icon']} {armor['name']} (+{armor['defense']} защиты) +{stats['armor_upgrade']}",
+            f"• Оружие: {weapon['icon']} {weapon['name']} +{stats['weapon_upgrade']}\n"
+            f"• Броня: {armor['icon']} {armor['name']} +{stats['armor_upgrade']}",
             reply_markup=get_back_keyboard(),
             parse_mode="Markdown"
         )
@@ -651,65 +869,15 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
         potion_id = data.split("_")[2]
         success, result = await use_potion(user_id, potion_id)
         await callback.answer(result, show_alert=True)
-    
-    # ЛУТБОКСЫ
-    elif data == "lottery_box":
-        kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🟢 Обычный сундук (20 🪙)", callback_data="open_box_common")],
-            [InlineKeyboardButton(text="🔵 Редкий сундук (100 🪙)", callback_data="open_box_rare")],
-            [InlineKeyboardButton(text="🟣 Эпический сундук (500 🪙)", callback_data="open_box_epic")],
-            [InlineKeyboardButton(text="🟠 Легендарный сундук (2000 🪙)", callback_data="open_box_legendary")],
-            [InlineKeyboardButton(text="◀️ Назад", callback_data="rpg_menu")]
-        ])
-        await callback.message.edit_text("🎁 **Лутбоксы**\n\nВыберите сундук:", reply_markup=kb, parse_mode="Markdown")
-    
-    elif data.startswith("open_box_"):
-        box_type = data.split("_")[2]
-        price = LOTTERY_BOXES[box_type]["price"]
-        user = await get_user(user_id)
-        
-        if user["rpg_balance"] < price:
-            await callback.answer(f"❌ Недостаточно {RPG_COIN_NAME}! Нужно {price}", show_alert=True)
-            return
-        
-        # Рандомный предмет
-        if box_type == "common":
-            rarities = ["common", "common", "common", "rare", "rare", "epic"]
-        elif box_type == "rare":
-            rarities = ["common", "rare", "rare", "rare", "epic", "epic", "legendary"]
-        elif box_type == "epic":
-            rarities = ["rare", "rare", "epic", "epic", "epic", "legendary", "legendary"]
-        else:
-            rarities = ["epic", "epic", "legendary", "legendary", "legendary"]
-        
-        rarity = random.choice(rarities)
-        
-        if rarity == "common":
-            items = [(1, WEAPONS[1]), (2, WEAPONS[2]), (1, ARMORS[1]), (2, ARMORS[2])]
-            item_type, item = random.choice(items)
-            if item_type == 1 or item_type == 2:
-                item_type = "weapon"
-            else:
-                item_type = "armor"
-        elif rarity == "rare":
-            items = [(3, WEAPONS[3]), (4, WEAPONS[4]), (3, ARMORS[3])]
-            item_type, item = random.choice(items)
-            item_type = "weapon" if item_type in [3,4] else "armor"
-        elif rarity == "epic":
-            items = [(5, WEAPONS[5]), (6, WEAPONS[6]), (4, ARMORS[4])]
-            item_type, item = random.choice(items)
-            item_type = "weapon" if item_type in [5,6] else "armor"
-        else:
-            items = [(7, WEAPONS[7]), (5, ARMORS[5])]
-            item_type, item = random.choice(items)
-            item_type = "weapon" if item_type == 7 else "armor"
-        
-        await update_user(user_id, rpg_balance=user["rpg_balance"] - price)
-        async with aiosqlite.connect(DB_PATH) as db:
-            await db.execute("INSERT INTO inventory (user_id, item_type, item_id, quantity) VALUES (?, ?, ?, 1) ON CONFLICT DO UPDATE SET quantity = quantity + 1", (user_id, item_type, str(item_type == "weapon" and item or item_type == "armor" and item or "")))
-            await db.commit()
-        
-        await callback.answer(f"🎁 Вы открыли {LOTTERY_BOXES[box_type]['name']} и получили {item['icon']} {item['name']}!", show_alert=True)
+        if success:
+            stats = await get_player_stats(user_id)
+            await callback.message.edit_text(
+                f"⚔️ **RPG РАЗДЕЛ** ⚔️\n\n"
+                f"❤️ HP: {stats['hp']}/{stats['max_hp']}\n\n"
+                f"Выберите действие:",
+                reply_markup=get_rpg_keyboard(),
+                parse_mode="Markdown"
+            )
     
     # ОБМЕН ВАЛЮТЫ
     elif data == "exchange_rpg":
@@ -726,165 +894,16 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
         await add_transaction(user_id, "exchange", pac_amount, f"Обмен {pac_amount} RPG → {pac_amount} PAC")
         
         await callback.answer(f"🔄 Обмен завершён! {pac_amount} {RPG_COIN_NAME} → {pac_amount} {COIN_NAME}", show_alert=True)
-    
-    # ПОПОЛНЕНИЕ
-    elif data == "deposit":
-        await callback.message.edit_text(
-            f"💎 **Пополнение {COIN_NAME}**\n\n"
-            f"💰 1 {COIN_NAME} = 0.8₽\n"
-            f"⚡ Минимальная покупка: 10 {COIN_NAME} (8₽)\n\n"
-            f"Способ оплаты: СБП\n"
-            f"📱 Номер телефона: `{SBP_PHONE}`\n\n"
-            f"После оплаты напишите /confirm_сумма",
-            reply_markup=get_back_keyboard(),
-            parse_mode="Markdown"
-        )
-    
-    # ПРЕМИУМ
-    elif data == "premium":
-        user = await get_user(user_id)
-        if user.get("is_premium"):
-            await callback.message.edit_text(
-                f"👑 **У вас есть премиум!**\n\nАктивен до: {user['premium_until']}",
-                reply_markup=get_back_keyboard(),
-                parse_mode="Markdown"
-            )
-        else:
-            kb = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text=f"💎 Купить за {PREMIUM_PRICE_PAC} PAC", callback_data="buy_premium")],
-                [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]
-            ])
-            await callback.message.edit_text(
-                f"👑 **Премиум подписка**\n\n"
-                f"💰 Стоимость: {PREMIUM_PRICE_PAC} {COIN_NAME}\n\n"
-                f"✨ **Преимущества:**\n"
-                f"• ⛏️ Шахта (до 250 PAC/день)\n"
-                f"• +15 PAC/день бонус\n\n"
-                f"Купить подписку?",
-                reply_markup=kb,
-                parse_mode="Markdown"
-            )
-    
-    elif data == "buy_premium":
-        user = await get_user(user_id)
-        if user["pac_balance"] >= PREMIUM_PRICE_PAC:
-            await update_user(user_id, 
-                pac_balance=user["pac_balance"] - PREMIUM_PRICE_PAC,
-                is_premium=1,
-                premium_until=(datetime.now() + timedelta(days=30)).isoformat()
-            )
-            await add_transaction(user_id, "premium", -PREMIUM_PRICE_PAC, "Премиум подписка")
-            await callback.answer("✅ Премиум активирован на 30 дней!", show_alert=True)
-            await callback.message.edit_text("👑 **Премиум активирован!**", reply_markup=get_main_keyboard(), parse_mode="Markdown")
-        else:
-            await callback.answer(f"❌ Недостаточно {COIN_NAME}!", show_alert=True)
-    
-    # ШАХТА
-    elif data == "mine":
-        info = await get_mine_info(user_id)
-        if "error" in info:
-            await callback.message.edit_text(info["error"], reply_markup=get_back_keyboard(), parse_mode="Markdown")
-        else:
-            kb = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="⛏️ Собрать", callback_data="mine_collect")],
-                [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]
-            ])
-            if not info["max_level"]:
-                kb.inline_keyboard.insert(0, [InlineKeyboardButton(text=f"⬆️ Улучшить ({info['upgrade_cost']} PAC)", callback_data="mine_upgrade")])
-            await callback.message.edit_text(
-                f"⛏️ **Шахта**\n\n"
-                f"📊 Уровень: {info['level']}/7\n"
-                f"⚡ Добыча: {info['daily_output']} PAC/день\n"
-                f"📦 Накоплено: {info['accumulated']} PAC\n\n"
-                f"💡 Шахта копит PAC до 3 дней!",
-                reply_markup=kb,
-                parse_mode="Markdown"
-            )
-    
-    elif data == "mine_collect":
-        success, msg = await collect_mine(user_id)
-        await callback.answer(msg, show_alert=True)
-    
-    elif data == "mine_upgrade":
-        success, msg = await upgrade_mine(user_id)
-        await callback.answer(msg, show_alert=True)
-    
-    # СТАТИСТИКА
-    elif data == "stats":
         user = await get_user(user_id)
         stats = await get_player_stats(user_id)
         await callback.message.edit_text(
-            f"📊 **Ваша статистика**\n\n"
-            f"👤 ID: {user_id}\n"
-            f"💎 {COIN_NAME}: {user['pac_balance']}\n"
+            f"⚔️ **RPG РАЗДЕЛ** ⚔️\n\n"
             f"🪙 {RPG_COIN_NAME}: {user['rpg_balance']}\n"
-            f"🎮 Игр: {user['total_games']}\n"
-            f"🔄 Оборот: {user['turnover']} {COIN_NAME}\n"
-            f"👥 Рефералов: {user['referrals']}\n"
-            f"👑 Премиум: {'✅' if user['is_premium'] else '❌'}\n"
-            f"⭐ Уровень: {stats['level']}\n"
-            f"💀 Побед: {stats['kills']}\n"
-            f"⚰️ Поражений: {stats['deaths']}",
-            reply_markup=get_back_keyboard(),
+            f"💎 {COIN_NAME}: {user['pac_balance']}\n\n"
+            f"Выберите действие:",
+            reply_markup=get_rpg_keyboard(),
             parse_mode="Markdown"
         )
-    
-    # ТОП-10
-    elif data == "top":
-        async with aiosqlite.connect(DB_PATH) as db:
-            async with db.execute("SELECT user_id, username, kills FROM player_stats ORDER BY kills DESC LIMIT 10") as cursor:
-                top_kills = await cursor.fetchall()
-        text = "🏆 **ТОП-10 по убийствам боссов:**\n\n"
-        for i, (uid, name, kills) in enumerate(top_kills, 1):
-            text += f"{i}. {name or uid} — {kills} убийств\n"
-        await callback.message.edit_text(text, reply_markup=get_back_keyboard(), parse_mode="Markdown")
-    
-    # ЕЖЕДНЕВНЫЙ БОНУС
-    elif data == "daily":
-        success, msg = await claim_daily_bonus(user_id)
-        await callback.answer(msg, show_alert=True)
-        if success:
-            user = await get_user(user_id)
-            await callback.message.edit_text(
-                f"🎮 **Главное меню**\n\n"
-                f"💎 {COIN_NAME}: {user['pac_balance']}",
-                reply_markup=get_main_keyboard(),
-                parse_mode="Markdown"
-            )
-    
-    # РЕФЕРАЛЫ
-    elif data == "referral":
-        user = await get_user(user_id)
-        ref_link = f"https://t.me/W1NPakshamNewBot?start={user_id}"
-        await callback.message.edit_text(
-            f"👥 **Реферальная система**\n\n"
-            f"💰 За друга: +5 {COIN_NAME}\n"
-            f"👥 Ваших: {user['referrals']}\n"
-            f"🔗 Ссылка:\n`{ref_link}`",
-            reply_markup=get_back_keyboard(),
-            parse_mode="Markdown"
-        )
-    
-    # ВЫВОД
-    elif data == "withdraw":
-        await callback.answer("⏸️ Вывод временно недоступен.", show_alert=True)
-    
-    # ПОМОЩЬ
-    elif data == "help":
-        text = (
-            "❓ **Помощь**\n\n"
-            "🎮 **Казино:** 15 игр на выбор\n"
-            "⚔️ **RPG режим:**\n"
-            "• Сражайся с 10 боссами\n"
-            "• Добывай ресурсы в пещерах\n"
-            "• Улучшай оружие и броню у кузнеца\n"
-            "• Покупай предметы в магазине\n"
-            "• Открывай лутбоксы\n\n"
-            "🔄 100 {RPG_COIN_NAME} = 1 {COIN_NAME}\n"
-            "👑 Премиум даёт шахту и бонусы\n\n"
-            "📞 По вопросам: @ZOJlOTOY"
-        )
-        await callback.message.edit_text(text, reply_markup=get_back_keyboard(), parse_mode="Markdown")
     
     await callback.answer()
 
