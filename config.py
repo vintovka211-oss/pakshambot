@@ -4,31 +4,35 @@ BOT_TOKEN = "8590452175:AAGKpZiKBmneyxUX8Ac9U7w9cRjtWQYT8uU"
 ADMIN_IDS = [8493522297]
 
 COIN_NAME = "PAC"
+RPG_COIN_NAME = "🪙 RPG"
 BONUS_PAC = 100
 PREMIUM_PRICE_PAC = 350
 
-# Кнопки ставок
+# Курсы обмена
+RPG_TO_PAC_RATE = 100  # 100 RPG = 1 PAC (невыводимый)
+
+# Кнопки ставок для казино
 BET_BUTTONS = [1, 5, 10, 25, 50, 100, 250, 500]
 
-# Маркетплейс
-MARKETPLACE_ITEMS = {
-    "gold_card": {"name": "🏆 Золотая карта", "price": 500, "emoji": "🏆", "description": "+5% к выигрышу на 7 дней"},
-    "diamond_card": {"name": "💎 Алмазная карта", "price": 1500, "emoji": "💎", "description": "+15% к выигрышу на 30 дней"},
-    "lucky_coin": {"name": "🍀 Счастливая монета", "price": 200, "emoji": "🍀", "description": "Увеличивает шанс на 10%"},
-    "mystery_box": {"name": "🎁 Тайный сундук", "price": 100, "emoji": "🎁", "description": "Случайный бонус от 50 до 500 PAC"},
-    "vip_pass": {"name": "👑 VIP пропуск", "price": 3000, "emoji": "👑", "description": "Доступ к VIP-играм"},
-    "four_leaf": {"name": "🍀 Четырёхлистный клевер", "price": 800, "emoji": "🍀", "description": "Шанс на выигрыш +15%"},
-    "rabbit_foot": {"name": "🐰 Кроличья лапка", "price": 1200, "emoji": "🐰", "description": "Удача +20% на 14 дней"},
-}
+# PvP настройки
+PVP_COMMISSION = 5  # 5% комиссия
+PVP_MIN_BET = 10
+PVP_MAX_BET = 1000
 
-MINE_LEVELS = {
-    1: {"name": "⛏️ Каменная", "daily_output": 10, "upgrade_cost": 500, "icon": "🪨"},
-    2: {"name": "⚒️ Угольная", "daily_output": 20, "upgrade_cost": 1500, "icon": "⚫"},
-    3: {"name": "🔩 Железная", "daily_output": 35, "upgrade_cost": 4000, "icon": "🔩"},
-    4: {"name": "⭐ Золотая", "daily_output": 60, "upgrade_cost": 10000, "icon": "⭐"},
-    5: {"name": "💎 Алмазная", "daily_output": 100, "upgrade_cost": 20000, "icon": "💎"},
-    6: {"name": "👑 Изумрудная", "daily_output": 150, "upgrade_cost": 40000, "icon": "🟢"},
-    7: {"name": "🌌 Космическая", "daily_output": 250, "upgrade_cost": None, "icon": "🌠"},
-}
+# Кланы
+CLAN_CREATE_PRICE = 1000  # RPG
+CLAN_MAX_MEMBERS = 20
 
+# Кузнец
+FORGE_UPGRADE_COST = {
+    1: 100, 2: 200, 3: 400, 4: 800, 5: 1600,
+    6: 3200, 7: 6400, 8: 12800, 9: 25600, 10: 51200
+}
+FORGE_UPGRADE_STATS = {i: i * 5 for i in range(1, 11)}  # +5 атаки за уровень
+
+# Прочность предметов
+ITEM_DURABILITY = 100  # начальная прочность
+REPAIR_COST_MULTIPLIER = 0.5  # 50% от цены предмета
+
+# СБП оплата
 SBP_PHONE = "+7 999 888 77 66"
