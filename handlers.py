@@ -381,12 +381,13 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
     
     # ТОП-10
     elif data == "top":
-        async with aiosqlite.connect(DB_PATH) as db:
-            async with db.execute("SELECT user_id, username, kills FROM player_stats ORDER BY kills DESC LIMIT 10") as cursor:
-                top_kills = await cursor.fetchall()
+        top_players = await get_top_players()
         text = "🏆 **ТОП-10 по убийствам боссов:**\n\n"
-        for i, (uid, name, kills) in enumerate(top_kills, 1):
-            text += f"{i}. {name or uid} — {kills} убийств\n"
+        for i, (uid, name, kills) in enumerate(top_players, 1):
+            username = name or str(uid)
+            text += f"{i}. {username} — {kills} убийств\n"
+        if not top_players:
+            text += "Пока нет убийств боссов!"
         await callback.message.edit_text(text, reply_markup=get_back_keyboard(), parse_mode="Markdown")
     
     # СТАТИСТИКА
@@ -409,7 +410,7 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
             parse_mode="Markdown"
         )
     
-    # ==================== ИГРЫ ====================
+    # ==================== ИГРЫ (КАЗИНО) ====================
     elif data == "games":
         await callback.message.edit_text("🎮 **Выберите игру:**", reply_markup=get_games_keyboard(), parse_mode="Markdown")
     
@@ -643,6 +644,8 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
     elif data.startswith("boss_"):
         boss_id = int(data.split("_")[1])
         success, fight_data = await fight_boss_start(user_id, boss_id, callback.message)
+        if not success:
+            await callback.message.edit_text(fight_data, reply_markup=get_rpg_keyboard(), parse_mode="Markdown")
     
     elif data.startswith("fight_attack_"):
         encoded = data.replace("fight_attack_", "")
