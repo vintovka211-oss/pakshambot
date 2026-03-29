@@ -9,7 +9,7 @@ async def init_db():
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
                 username TEXT,
-                pac_balance INTEGER DEFAULT 5,
+                pac_balance INTEGER DEFAULT 100,
                 total_games INTEGER DEFAULT 0,
                 turnover INTEGER DEFAULT 0,
                 referrals INTEGER DEFAULT 0,
@@ -17,9 +17,11 @@ async def init_db():
                 premium_until TIMESTAMP,
                 last_daily TIMESTAMP,
                 last_withdraw TIMESTAMP,
+                consecutive_wins INTEGER DEFAULT 0,
                 mine_level INTEGER DEFAULT 1,
                 mine_last_collect TIMESTAMP,
-                mine_accumulated INTEGER DEFAULT 0
+                mine_accumulated INTEGER DEFAULT 0,
+                active_items TEXT DEFAULT '{}'
             )
         ''')
         await db.execute('''
@@ -74,49 +76,6 @@ async def get_top_users(limit=10):
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute("SELECT user_id, username, turnover FROM users ORDER BY turnover DESC LIMIT ?", (limit,)) as cursor:
             return await cursor.fetchall()
-
-# ==================== ПОПОЛНЕНИЕ ====================
-async def create_deposit_request(user_id, amount, method):
-    from config import PAC_PRICE
-    # 1₽ = 1 PAC (80 PAC за 80₽)
-    amount_pac = amount  # ← ИСПРАВЛЕНО: amount * (PAC_PRICE // 100) было неправильно
-    async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute(
-            "INSERT INTO deposit_requests (user_id, amount, amount_pac, method) VALUES (?, ?, ?, ?)",
-            (user_id, amount, amount_pac, method)
-        )
-        await db.commit()
-        return True, cursor.lastrowid, amount_pac
-
-async def approve_deposit(request_id):
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute("SELECT user_id, amount_pac FROM deposit_requests WHERE id = ? AND status = 'pending'", (request_id,)) as cursor:
-            req = await cursor.fetchone()
-        if not req:
-            return False, "Заявка не найдена"
-        user_id, amount_pac = req
-        user = await get_user(user_id)
-        await update_user(user_id, pac_balance=user["pac_balance"] + amount_pac)
-        await db.execute("UPDATE deposit_requests SET status = 'approved' WHERE id = ?", (request_id,))
-        await db.commit()
-        return True, f"✅ Пополнено {amount_pac} PAC!"
-
-# ==================== ВЫВОД (ВРЕМЕННО НЕДОСТУПЕН) ====================
-async def create_withdraw_request(user_id, amount_pac):
-    return False, "⏸️ Вывод временно недоступен. Ведутся технические работы."
-
-# ==================== ЕЖЕДНЕВНЫЙ БОНУС ====================
-async def claim_daily_bonus(user_id):
-    user = await get_user(user_id)
-    if user.get("last_daily"):
-        last = datetime.fromisoformat(user["last_daily"]) if isinstance(user["last_daily"], str) else user["last_daily"]
-        if (datetime.now() - last).days < 1:
-            return False, "❌ Бонус уже получен сегодня!"
-    
-    bonus = 15 if user.get("is_premium") else 5
-    await update_user(user_id, pac_balance=user["pac_balance"] + bonus, last_daily=datetime.now().isoformat())
-    await add_transaction(user_id, "daily_bonus", bonus, "Ежедневный бонус")
-    return True, f"✅ Вы получили {bonus} PAC!"
 
 # ==================== ШАХТА ====================
 async def get_mine_info(user_id):
@@ -186,11 +145,22 @@ async def upgrade_mine(user_id):
     await add_transaction(user_id, "mine_upgrade", -cost, f"Улучшение шахты до {current_level + 1} уровня")
     return True, f"✅ Шахта улучшена до {next_level_data['name']}!"
 
+# ==================== ЕЖЕДНЕВНЫЙ БОНУС ====================
+async def claim_daily_bonus(user_id):
+    user = await get_user(user_id)
+    if user.get("last_daily"):
+        last = datetime.fromisoformat(user["last_daily"]) if isinstance(user["last_daily"], str) else user["last_daily"]
+        if (datetime.now() - last).days < 1:
+            return False, "❌ Бонус уже получен сегодня!"
+    
+    bonus = 15 if user.get("is_premium") else 5
+    await update_user(user_id, pac_balance=user["pac_balance"] + bonus, last_daily=datetime.now().isoformat())
+    await add_transaction(user_id, "daily_bonus", bonus, "Ежедневный бонус")
+    return True, f"✅ Вы получили {bonus} PAC!"
+
 # ==================== ПРЕМИУМ ====================
 async def buy_premium(user_id):
-    from config import PREMIUM_PRICE_PAC  # ← ДОБАВИЛ ИМПОРТ
-    from datetime import timedelta
-    
+    from config import PREMIUM_PRICE_PAC
     user = await get_user(user_id)
     if user.get("is_premium"):
         return False, "❌ У вас уже есть премиум!"
