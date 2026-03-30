@@ -12,7 +12,9 @@ from database import *
 from keyboards import *
 from games import *
 from rpg import *
+from clans import *
 
+# ==================== СОСТОЯНИЯ ====================
 class AdminStates(StatesGroup):
     waiting_user_id = State()
     waiting_amount = State()
@@ -20,6 +22,9 @@ class AdminStates(StatesGroup):
 
 class GameStates(StatesGroup):
     waiting_bet = State()
+
+class ClanStates(StatesGroup):
+    waiting_name = State()
 
 # ==================== АДМИН ====================
 async def is_admin(user_id):
@@ -131,11 +136,42 @@ async def admin_process_premium(message: types.Message, state: FSMContext):
     await message.answer(f"✅ Выдан премиум на {days} дней пользователю {target_user}")
     await state.clear()
 
+# ==================== КЛАНЫ ====================
+async def clan_name_handler(message: types.Message, state: FSMContext):
+    clan_name = message.text.strip()
+    if len(clan_name) > 20:
+        await message.answer("❌ Название клана не должно превышать 20 символов!")
+        return
+    
+    success, msg = await create_clan(message.from_user.id, clan_name)
+    await message.answer(msg)
+    await state.clear()
+    
+    if success:
+        user = await get_user(message.from_user.id)
+        stats = await get_player_stats(message.from_user.id)
+        await message.answer(
+            f"🎮 **Главное меню**\n\n"
+            f"👤 ID: {message.from_user.id}\n"
+            f"💎 {COIN_NAME}: {user['pac_balance']}\n"
+            f"🪙 {RPG_COIN_NAME}: {user['rpg_balance']}\n"
+            f"❤️ HP: {stats['hp']}/{stats['max_hp']}",
+            reply_markup=get_main_keyboard(),
+            parse_mode="Markdown"
+        )
+
 # ==================== /start ====================
 async def start_command(message: types.Message):
     user_id = message.from_user.id
     user = await get_user(user_id)
     stats = await get_player_stats(user_id)
+    
+    # Проверка на реферальную ссылку из клана
+    args = message.text.split()
+    if len(args) > 1 and args[1].startswith("clan_"):
+        clan_id = int(args[1].split("_")[1])
+        success, msg = await join_clan(user_id, clan_id)
+        await message.answer(msg)
     
     if user.get("pac_balance", 0) == 100 and stats.get("level", 1) == 1:
         await update_user(user_id, pac_balance=BONUS_PAC, username=message.from_user.username or str(user_id))
@@ -178,6 +214,7 @@ async def welcome_new_member(message: types.Message):
                 f"• ⚔️ 30 боссов с уникальными наградами\n"
                 f"• ⛏️ Шахта для пассивного дохода\n"
                 f"• 🧪 Зелья, артефакты, улучшения\n"
+                f"• 🏰 Кланы и клановые боссы\n"
                 f"• 💰 Вывод средств на карту\n\n"
                 f"📱 **Играй прямо сейчас:** @W1NPakshamNewBot\n"
                 f"📞 По вопросам: @ZOJlOTOY",
@@ -190,7 +227,8 @@ async def welcome_new_member(message: types.Message):
                 f"• 🎮 Азартные игры с выводом средств\n"
                 f"• ⚔️ 30 боссов с крутыми наградами\n"
                 f"• ⛏️ Шахту для пассивного дохода\n"
-                f"• 🧪 Зелья, артефакты, прокачку\n\n"
+                f"• 🧪 Зелья, артефакты, прокачку\n"
+                f"• 🏰 Кланы и клановые боссы\n\n"
                 f"💎 **Начать игру:** @W1NPakshamNewBot\n"
                 f"💰 **Бонус 100 PAC за регистрацию!**\n\n"
                 f"👋 Приятной игры!",
@@ -391,10 +429,14 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
             "🎮 **Казино:** 15 игр на выбор\n"
             "⚔️ **RPG режим:**\n"
             "• Сражайся с 30 боссами\n"
-            "• Добывай ресурсы в 7 пещерах (от 5 до 240 минут)\n"
+            "• Добывай ресурсы в 7 пещерах (от 5 до 120 минут)\n"
             "• Улучшай оружие и броню у кузнеца\n"
             "• Покупай предметы в магазине\n"
             "• Собирай артефакты и ресурсы\n\n"
+            "🏰 **Кланы:**\n"
+            "• Создай клан за 1000 RPG\n"
+            "• Сражайся с клановыми боссами\n"
+            "• Получай бонусы за уровень клана\n\n"
             "🔄 100 {RPG_COIN_NAME} = 1 {COIN_NAME}\n"
             "👑 Премиум даёт шахту и бонусы\n\n"
             "🔥 **Ежедневные ивенты:**\n"
@@ -658,6 +700,7 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
     elif data == "rpg_menu":
         user = await get_user(user_id)
         stats = await get_player_stats(user_id)
+        tool = await get_tool(user_id)
         await callback.message.edit_text(
             f"⚔️ **RPG РАЗДЕЛ** ⚔️\n\n"
             f"📊 Уровень: {stats['level']}\n"
@@ -666,12 +709,65 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
             f"🪙 {RPG_COIN_NAME}: {user['rpg_balance']}\n"
             f"🗡️ Оружие: {WEAPONS.get(stats['weapon_id'], WEAPONS[1])['name']} +{stats['weapon_upgrade']}\n"
             f"🛡️ Броня: {ARMORS.get(stats['armor_id'], ARMORS[1])['name']} +{stats['armor_upgrade']}\n"
+            f"🔧 Инструмент: {tool['name']}\n"
             f"💀 Побед: {stats['kills']} | Поражений: {stats['deaths']}\n\n"
             f"🔥 **Доступно боссов:** {len([b for b in BOSSES.values() if b['min_level'] <= stats['level']])}/{len(BOSSES)}\n\n"
             f"Выберите действие:",
             reply_markup=get_rpg_keyboard(),
             parse_mode="Markdown"
         )
+    
+    # УЛУЧШЕНИЕ ИНСТРУМЕНТА
+    elif data == "upgrade_tool":
+        success, msg = await upgrade_tool(user_id)
+        await callback.answer(msg, show_alert=True)
+        if success:
+            tool = await get_tool(user_id)
+            await callback.message.edit_text(
+                f"🔧 **Ваш инструмент:** {tool['name']}\n"
+                f"📊 Уровень: {tool['level']}/{len(TOOLS)}\n\n"
+                f"Выберите действие:",
+                reply_markup=get_rpg_keyboard(),
+                parse_mode="Markdown"
+            )
+    
+    # ПРОДАЖА РУДЫ
+    elif data == "sell_ores":
+        async with aiosqlite.connect(DB_PATH) as db:
+            async with db.execute("SELECT item_id, quantity FROM inventory WHERE user_id = ? AND item_type = 'ore' AND quantity > 0", (user_id,)) as cursor:
+                ores = await cursor.fetchall()
+        
+        if not ores:
+            await callback.answer("❌ У вас нет руды для продажи!", show_alert=True)
+            return
+        
+        kb = InlineKeyboardMarkup(inline_keyboard=[])
+        for ore_id, qty in ores:
+            ore = ORES[ore_id]
+            kb.inline_keyboard.append([InlineKeyboardButton(text=f"{ore['icon']} {ore['name']} x{qty} - {ore['value'] * qty} 🪙", callback_data=f"sell_ore_{ore_id}_{qty}")])
+        kb.inline_keyboard.append([InlineKeyboardButton(text="◀️ Назад", callback_data="rpg_menu")])
+        await callback.message.edit_text("💰 **Продажа руды**\n\nВыберите ресурс для продажи:", reply_markup=kb, parse_mode="Markdown")
+    
+    elif data.startswith("sell_ore_"):
+        parts = data.split("_")
+        ore_id = parts[2]
+        quantity = int(parts[3])
+        success, msg = await sell_ore(user_id, ore_id, quantity)
+        await callback.answer(msg, show_alert=True)
+        if success:
+            async with aiosqlite.connect(DB_PATH) as db:
+                async with db.execute("SELECT item_id, quantity FROM inventory WHERE user_id = ? AND item_type = 'ore' AND quantity > 0", (user_id,)) as cursor:
+                    ores = await cursor.fetchall()
+            
+            if not ores:
+                await callback.message.edit_text("💰 **Продажа руды**\n\nУ вас больше нет руды!", reply_markup=get_rpg_keyboard(), parse_mode="Markdown")
+            else:
+                kb = InlineKeyboardMarkup(inline_keyboard=[])
+                for ore_id, qty in ores:
+                    ore = ORES[ore_id]
+                    kb.inline_keyboard.append([InlineKeyboardButton(text=f"{ore['icon']} {ore['name']} x{qty} - {ore['value'] * qty} 🪙", callback_data=f"sell_ore_{ore_id}_{qty}")])
+                kb.inline_keyboard.append([InlineKeyboardButton(text="◀️ Назад", callback_data="rpg_menu")])
+                await callback.message.edit_text("💰 **Продажа руды**\n\nВыберите ресурс для продажи:", reply_markup=kb, parse_mode="Markdown")
     
     # БОССЫ
     elif data == "fight_boss":
@@ -738,7 +834,7 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
         await callback.message.edit_text(
             f"⛏️ **{cave['name']}** ⛏️\n\n"
             f"💰 Добыча: {cave['min_resources']}-{cave['max_resources']} ресурсов\n"
-            f"❤️ Стоимость HP: {cave['hp_cost']}\n"
+            f"🔧 Требуется инструмент: {TOOLS[cave['required_tool']]['name']}\n"
             f"🎁 Ресурсы: {', '.join([t for t in cave['tiers']])}\n\n"
             f"Выберите время добычи:",
             reply_markup=get_cave_duration_keyboard(cave_level),
@@ -856,9 +952,9 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
                 elif item_type == "potion":
                     name = POTIONS[item_id]["name"]
                     icon = POTIONS[item_id]["icon"]
-                elif item_type == "resource":
-                    name = RESOURCES[item_id]["name"]
-                    icon = RESOURCES[item_id]["icon"]
+                elif item_type == "ore":
+                    name = ORES[item_id]["name"]
+                    icon = ORES[item_id]["icon"]
                 elif item_type == "artifact":
                     name = ARTIFACTS[int(item_id)]["name"]
                     icon = ARTIFACTS[int(item_id)]["icon"]
@@ -943,6 +1039,7 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
         user = await get_user(user_id)
         weapon = WEAPONS.get(stats["weapon_id"], WEAPONS[1])
         armor = ARMORS.get(stats["armor_id"], ARMORS[1])
+        tool = await get_tool(user_id)
         total_attack = 10 + stats["level"] + weapon["attack"] + (stats["weapon_upgrade"] * 5)
         total_defense = stats["level"] + armor["defense"] + (stats["armor_upgrade"] * 3)
         
@@ -958,7 +1055,8 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
             f"🪙 {RPG_COIN_NAME}: {user['rpg_balance']}\n\n"
             f"⚔️ **Снаряжение:**\n"
             f"• Оружие: {weapon['icon']} {weapon['name']} +{stats['weapon_upgrade']}\n"
-            f"• Броня: {armor['icon']} {armor['name']} +{stats['armor_upgrade']}",
+            f"• Броня: {armor['icon']} {armor['name']} +{stats['armor_upgrade']}\n"
+            f"🔧 Инструмент: {tool['name']}",
             reply_markup=get_back_keyboard(),
             parse_mode="Markdown"
         )
@@ -1020,6 +1118,90 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
             reply_markup=get_rpg_keyboard(),
             parse_mode="Markdown"
         )
+    
+    # ==================== КЛАНЫ ====================
+    elif data == "clan_menu":
+        clan = await get_user_clan(user_id)
+        if clan:
+            text = await get_clan_info(clan["id"])
+            await callback.message.edit_text(text, reply_markup=get_clan_keyboard(), parse_mode="Markdown")
+        else:
+            await callback.message.edit_text("🏰 **Кланы**\n\nВы не состоите в клане!\n\nСоздайте свой клан или вступите в существующий.", 
+                                            reply_markup=get_no_clan_keyboard(), parse_mode="Markdown")
+    
+    elif data == "clan_create":
+        await callback.message.answer("🏷️ Введите название клана (до 20 символов):")
+        await state.set_state(ClanStates.waiting_name)
+    
+    elif data == "clan_info":
+        clan = await get_user_clan(user_id)
+        if clan:
+            text = await get_clan_info(clan["id"])
+            await callback.message.edit_text(text, reply_markup=get_clan_keyboard(), parse_mode="Markdown")
+    
+    elif data == "clan_members":
+        clan = await get_user_clan(user_id)
+        if clan:
+            members = eval(clan["members"])
+            text = "👥 **Участники клана:**\n\n"
+            for i, member in enumerate(members, 1):
+                user = await get_user(member)
+                stats = await get_player_stats(member)
+                role = "👑 Лидер" if member == clan["leader_id"] else "⚔️ Воин"
+                text += f"{i}. {user['username'] or member} - {role} (Ур.{stats['level']})\n"
+            await callback.message.edit_text(text, reply_markup=get_back_keyboard(), parse_mode="Markdown")
+    
+    elif data == "clan_boss":
+        clan = await get_user_clan(user_id)
+        if clan:
+            success, msg = await start_clan_boss(clan["id"])
+            await callback.answer(msg, show_alert=True)
+            if success:
+                await callback.message.edit_text(msg, reply_markup=get_clan_keyboard(), parse_mode="Markdown")
+    
+    elif data == "clan_upgrade":
+        clan = await get_user_clan(user_id)
+        if clan and clan["leader_id"] == user_id:
+            next_level = CLAN_LEVELS.get(clan["level"] + 1)
+            if next_level and clan["exp"] >= next_level["exp_needed"]:
+                success, msg = await update_clan_exp(clan["id"], clan["exp"])
+                await callback.answer(msg, show_alert=True)
+            else:
+                await callback.answer(f"❌ Нужно {next_level['exp_needed']} опыта!", show_alert=True)
+        else:
+            await callback.answer("❌ Только лидер может улучшить клан!", show_alert=True)
+    
+    elif data == "clan_leave":
+        success, msg = await leave_clan(user_id)
+        await callback.answer(msg, show_alert=True)
+        if success:
+            await callback.message.edit_text("🏰 **Кланы**\n\nВы покинули клан.", reply_markup=get_main_keyboard(), parse_mode="Markdown")
+    
+    elif data == "clan_disband":
+        success, msg = await disband_clan(user_id)
+        await callback.answer(msg, show_alert=True)
+        if success:
+            await callback.message.edit_text("🏰 **Кланы**\n\nКлан распущен.", reply_markup=get_main_keyboard(), parse_mode="Markdown")
+    
+    elif data == "clan_search":
+        async with aiosqlite.connect(DB_PATH) as db:
+            async with db.execute("SELECT id, name, level FROM clans ORDER BY level DESC LIMIT 20") as cursor:
+                clans = await cursor.fetchall()
+        
+        text = "🔍 **Поиск кланов:**\n\n"
+        for cid, name, level in clans:
+            level_data = CLAN_LEVELS.get(level, CLAN_LEVELS[1])
+            text += f"{level_data['icon']} {name} (Ур.{level})\n"
+            text += f"   [Вступить](https://t.me/W1NPakshamNewBot?start=clan_{cid})\n\n"
+        
+        await callback.message.edit_text(text, reply_markup=get_back_keyboard(), parse_mode="Markdown")
+    
+    elif data.startswith("clan_") and data != "clan_menu" and data != "clan_info" and data != "clan_members" and data != "clan_boss" and data != "clan_upgrade" and data != "clan_leave" and data != "clan_disband" and data != "clan_search":
+        clan_id = int(data.split("_")[1])
+        success, msg = await join_clan(user_id, clan_id)
+        await callback.answer(msg, show_alert=True)
+        if success:
+            await callback.message.edit_text("🏰 **Кланы**\n\nВы вступили в клан!", reply_markup=get_main_keyboard(), parse_mode="Markdown")
     
     await callback.answer()
 
