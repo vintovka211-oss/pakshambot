@@ -1,7 +1,7 @@
 import random
 import asyncio
 import aiosqlite
-from config import BOSSES, WEAPONS, ARMORS, POTIONS, ARTIFACTS, ORES, CAVES, TOOLS, EVENTS, RPG_COIN_NAME, RESOURCES
+from config import BOSSES, WEAPONS, ARMORS, POTIONS, ARTIFACTS, ORES, CAVES, TOOLS, EVENTS, RPG_COIN_NAME
 from database import get_user, update_user, add_transaction, get_player_stats, update_player_stats, DB_PATH
 
 active_fights = {}
