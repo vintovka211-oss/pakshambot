@@ -488,9 +488,69 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
             parse_mode="Markdown"
         )
     
-    # ==================== ИГРЫ ====================
+        # ==================== ИГРЫ ====================
     elif data == "games":
         await callback.message.edit_text("🎮 **Выберите игру:**", reply_markup=get_games_keyboard(), parse_mode="Markdown")
+    
+    # МИНЫ
+    elif data == "game_mines":
+        await callback.message.edit_text("💣 **Мины**\n\nВыберите ставку:", reply_markup=get_bet_keyboard("mines"), parse_mode="Markdown")
+    
+    elif data.startswith("mines_bet_"):
+        bet = int(data.split("_")[2])
+        game_data = await play_mines(user_id, bet, callback.message)
+        if game_data:
+            active_games[user_id] = game_data
+    
+    elif data.startswith("mines_cell_"):
+        cell = int(data.split("_")[2])
+        game_data = active_games.get(user_id)
+        if game_data:
+            result = await mines_click(user_id, cell, game_data, callback.message)
+            if result:
+                active_games[user_id] = result
+            else:
+                active_games.pop(user_id, None)
+    
+    elif data.startswith("mines_cashout_"):
+        parts = data.split("_")
+        bet = int(parts[2])
+        step = int(parts[3])
+        multiplier = float(parts[4])
+        game_data = active_games.get(user_id)
+        if game_data:
+            await mines_cashout(user_id, bet, step, multiplier, callback.message)
+            active_games.pop(user_id, None)
+    
+    # БАШНЯ
+    elif data == "game_tower":
+        await callback.message.edit_text("🗼 **Башня**\n\nВыберите ставку:", reply_markup=get_bet_keyboard("tower"), parse_mode="Markdown")
+    
+    elif data.startswith("tower_bet_"):
+        bet = int(data.split("_")[2])
+        game_data = await play_tower(user_id, bet, callback.message)
+        if game_data:
+            active_games[user_id] = game_data
+    
+    elif data.startswith("tower_choice_"):
+        choice = int(data.split("_")[2])
+        game_data = active_games.get(user_id)
+        if game_data:
+            result = await tower_click(user_id, choice, game_data, callback.message)
+            if result:
+                active_games[user_id] = result
+            else:
+                active_games.pop(user_id, None)
+    
+    elif data.startswith("tower_cashout_"):
+        parts = data.split("_")
+        bet = int(parts[2])
+        current_level = int(parts[3])
+        multiplier = float(parts[4])
+        game_data = active_games.get(user_id)
+        if game_data:
+            await tower_cashout(user_id, bet, current_level, multiplier, callback.message)
+            active_games.pop(user_id, None)
     
     # КУБИК (ЧЁТ/НЕЧЁТ)
     elif data == "game_dice":
