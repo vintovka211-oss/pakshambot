@@ -1,5 +1,5 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from config import BET_BUTTONS, WEAPONS, ARMORS, POTIONS, BOSSES, CAVES, EVENTS
+from config import BET_BUTTONS, WEAPONS, ARMORS, POTIONS, BOSSES, CAVES, ORES
 
 def get_main_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -135,11 +135,14 @@ def get_rpg_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="⚔️ Сразиться с боссом", callback_data="fight_boss")],
         [InlineKeyboardButton(text="⛏️ Пойти в пещеру", callback_data="cave_menu")],
+        [InlineKeyboardButton(text="🔧 Улучшить инструмент", callback_data="upgrade_tool")],
+        [InlineKeyboardButton(text="💰 Продать руду", callback_data="sell_ores")],
         [InlineKeyboardButton(text="🗡️ Кузнец", callback_data="forge")],
         [InlineKeyboardButton(text="🛡️ Мой инвентарь", callback_data="my_inventory")],
         [InlineKeyboardButton(text="📊 Мои характеристики", callback_data="my_stats_rpg")],
         [InlineKeyboardButton(text="❤️ Использовать зелье", callback_data="use_potion")],
         [InlineKeyboardButton(text="🔄 Обменять RPG на PAC", callback_data="exchange_rpg")],
+        [InlineKeyboardButton(text="🏰 Клан", callback_data="clan_menu")],
         [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")],
     ])
 
@@ -168,7 +171,7 @@ def get_fight_keyboard(fight_data):
 def get_cave_keyboard():
     kb = InlineKeyboardMarkup(inline_keyboard=[])
     for level, cave in CAVES.items():
-        kb.inline_keyboard.append([InlineKeyboardButton(text=f"{cave['name']} ({cave['hp_cost']} HP)", callback_data=f"cave_{level}")])
+        kb.inline_keyboard.append([InlineKeyboardButton(text=f"{cave['name']} (Ур.{level})", callback_data=f"cave_{level}")])
     kb.inline_keyboard.append([InlineKeyboardButton(text="◀️ Назад", callback_data="rpg_menu")])
     return kb
 
@@ -179,7 +182,6 @@ def get_cave_duration_keyboard(cave_level):
         [InlineKeyboardButton(text="⏱️ 30 минут", callback_data=f"cave_time_{cave_level}_30")],
         [InlineKeyboardButton(text="⏱️ 60 минут", callback_data=f"cave_time_{cave_level}_60")],
         [InlineKeyboardButton(text="⏱️ 120 минут", callback_data=f"cave_time_{cave_level}_120")],
-        [InlineKeyboardButton(text="⏱️ 240 минут", callback_data=f"cave_time_{cave_level}_240")],
         [InlineKeyboardButton(text="◀️ Назад", callback_data="cave_menu")]
     ])
 
@@ -206,4 +208,22 @@ def get_admin_keyboard():
         [InlineKeyboardButton(text="👑 Выдать премиум", callback_data="admin_give_premium")],
         [InlineKeyboardButton(text="🎁 Выдать бонус", callback_data="admin_give_bonus")],
         [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")],
+    ])
+
+def get_clan_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🏰 Информация о клане", callback_data="clan_info")],
+        [InlineKeyboardButton(text="👥 Участники", callback_data="clan_members")],
+        [InlineKeyboardButton(text="⚔️ Клановый босс", callback_data="clan_boss")],
+        [InlineKeyboardButton(text="💪 Улучшить клан", callback_data="clan_upgrade")],
+        [InlineKeyboardButton(text="👋 Покинуть клан", callback_data="clan_leave")],
+        [InlineKeyboardButton(text="🗑️ Распустить клан", callback_data="clan_disband")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="rpg_menu")],
+    ])
+
+def get_no_clan_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="➕ Создать клан", callback_data="clan_create")],
+        [InlineKeyboardButton(text="🔍 Найти клан", callback_data="clan_search")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="rpg_menu")],
     ])
