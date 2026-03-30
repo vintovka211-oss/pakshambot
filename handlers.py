@@ -166,7 +166,6 @@ async def start_command(message: types.Message):
     user = await get_user(user_id)
     stats = await get_player_stats(user_id)
     
-    # Проверка на реферальную ссылку из клана
     args = message.text.split()
     if len(args) > 1 and args[1].startswith("clan_"):
         clan_id = int(args[1].split("_")[1])
@@ -719,17 +718,7 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
     
     # УЛУЧШЕНИЕ ИНСТРУМЕНТА
     elif data == "upgrade_tool":
-        success, msg = await upgrade_tool(user_id)
-        await callback.answer(msg, show_alert=True)
-        if success:
-            tool = await get_tool(user_id)
-            await callback.message.edit_text(
-                f"🔧 **Ваш инструмент:** {tool['name']}\n"
-                f"📊 Уровень: {tool['level']}/{len(TOOLS)}\n\n"
-                f"Выберите действие:",
-                reply_markup=get_rpg_keyboard(),
-                parse_mode="Markdown"
-            )
+        await upgrade_tool(user_id, callback.message)
     
     # ПРОДАЖА РУДЫ
     elif data == "sell_ores":
@@ -752,22 +741,7 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
         parts = data.split("_")
         ore_id = parts[2]
         quantity = int(parts[3])
-        success, msg = await sell_ore(user_id, ore_id, quantity)
-        await callback.answer(msg, show_alert=True)
-        if success:
-            async with aiosqlite.connect(DB_PATH) as db:
-                async with db.execute("SELECT item_id, quantity FROM inventory WHERE user_id = ? AND item_type = 'ore' AND quantity > 0", (user_id,)) as cursor:
-                    ores = await cursor.fetchall()
-            
-            if not ores:
-                await callback.message.edit_text("💰 **Продажа руды**\n\nУ вас больше нет руды!", reply_markup=get_rpg_keyboard(), parse_mode="Markdown")
-            else:
-                kb = InlineKeyboardMarkup(inline_keyboard=[])
-                for ore_id, qty in ores:
-                    ore = ORES[ore_id]
-                    kb.inline_keyboard.append([InlineKeyboardButton(text=f"{ore['icon']} {ore['name']} x{qty} - {ore['value'] * qty} 🪙", callback_data=f"sell_ore_{ore_id}_{qty}")])
-                kb.inline_keyboard.append([InlineKeyboardButton(text="◀️ Назад", callback_data="rpg_menu")])
-                await callback.message.edit_text("💰 **Продажа руды**\n\nВыберите ресурс для продажи:", reply_markup=kb, parse_mode="Markdown")
+        await sell_ore(user_id, ore_id, quantity, callback.message)
     
     # БОССЫ
     elif data == "fight_boss":
@@ -775,9 +749,7 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
     
     elif data.startswith("boss_"):
         boss_id = int(data.split("_")[1])
-        success, fight_data = await fight_boss_start(user_id, boss_id, callback.message)
-        if not success:
-            await callback.message.edit_text(fight_data, reply_markup=get_rpg_keyboard(), parse_mode="Markdown")
+        await fight_boss_start(user_id, boss_id, callback.message)
     
     elif data.startswith("fight_attack_"):
         encoded = data.replace("fight_attack_", "")
@@ -789,28 +761,7 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
             "player_attack": int(parts[3]),
             "boss_attack": int(parts[4])
         }
-        result = await fight_attack(user_id, callback, fight_data)
-        if result == "win":
-            user = await get_user(user_id)
-            stats = await get_player_stats(user_id)
-            await callback.message.edit_text(
-                f"⚔️ **RPG РАЗДЕЛ** ⚔️\n\n"
-                f"❤️ HP: {stats['hp']}/{stats['max_hp']}\n"
-                f"🪙 {RPG_COIN_NAME}: {user['rpg_balance']}\n\n"
-                f"Выберите действие:",
-                reply_markup=get_rpg_keyboard(),
-                parse_mode="Markdown"
-            )
-        elif result == "lose":
-            user = await get_user(user_id)
-            stats = await get_player_stats(user_id)
-            await callback.message.edit_text(
-                f"⚔️ **RPG РАЗДЕЛ** ⚔️\n\n"
-                f"❤️ HP: {stats['hp']}/{stats['max_hp']}\n\n"
-                f"Выберите действие:",
-                reply_markup=get_rpg_keyboard(),
-                parse_mode="Markdown"
-            )
+        await fight_attack(user_id, callback, fight_data)
     
     elif data.startswith("fight_heal_"):
         encoded = data.replace("fight_heal_", "")
@@ -822,7 +773,7 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
             "player_attack": int(parts[3]),
             "boss_attack": int(parts[4])
         }
-        result = await fight_heal(user_id, callback, fight_data)
+        await fight_heal(user_id, callback, fight_data)
     
     # ПЕЩЕРА
     elif data == "cave_menu":
@@ -845,17 +796,7 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
         parts = data.split("_")
         cave_level = int(parts[2])
         duration = int(parts[3])
-        success, result = await go_to_cave(user_id, cave_level, duration)
-        await callback.answer(result[:200], show_alert=True)
-        if success:
-            stats = await get_player_stats(user_id)
-            await callback.message.edit_text(
-                f"⚔️ **RPG РАЗДЕЛ** ⚔️\n\n"
-                f"❤️ HP: {stats['hp']}/{stats['max_hp']}\n\n"
-                f"Выберите действие:",
-                reply_markup=get_rpg_keyboard(),
-                parse_mode="Markdown"
-            )
+        await go_to_cave(user_id, cave_level, duration, callback.message)
     
     # КУЗНЕЦ
     elif data == "forge":
@@ -875,40 +816,10 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
         )
     
     elif data == "upgrade_weapon":
-        success, result = await upgrade_weapon(user_id)
-        await callback.answer(result, show_alert=True)
-        if success:
-            stats = await get_player_stats(user_id)
-            await callback.message.edit_text(
-                f"🔨 **Кузнец** 🔨\n\n"
-                f"🗡️ Оружие: +{stats['weapon_upgrade']}\n"
-                f"🛡️ Броня: +{stats['armor_upgrade']}\n\n"
-                f"Выберите действие:",
-                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="🗡️ Улучшить оружие", callback_data="upgrade_weapon")],
-                    [InlineKeyboardButton(text="🛡️ Улучшить броню", callback_data="upgrade_armor")],
-                    [InlineKeyboardButton(text="◀️ Назад", callback_data="rpg_menu")]
-                ]),
-                parse_mode="Markdown"
-            )
+        await upgrade_weapon(user_id, callback.message)
     
     elif data == "upgrade_armor":
-        success, result = await upgrade_armor(user_id)
-        await callback.answer(result, show_alert=True)
-        if success:
-            stats = await get_player_stats(user_id)
-            await callback.message.edit_text(
-                f"🔨 **Кузнец** 🔨\n\n"
-                f"🗡️ Оружие: +{stats['weapon_upgrade']}\n"
-                f"🛡️ Броня: +{stats['armor_upgrade']}\n\n"
-                f"Выберите действие:",
-                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="🗡️ Улучшить оружие", callback_data="upgrade_weapon")],
-                    [InlineKeyboardButton(text="🛡️ Улучшить броню", callback_data="upgrade_armor")],
-                    [InlineKeyboardButton(text="◀️ Назад", callback_data="rpg_menu")]
-                ]),
-                parse_mode="Markdown"
-            )
+        await upgrade_armor(user_id, callback.message)
     
     # МАГАЗИН
     elif data == "shop":
@@ -917,20 +828,17 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
     elif data.startswith("buy_weapon_"):
         item_id = int(data.split("_")[2])
         item = WEAPONS[item_id]
-        success, result = await buy_item(user_id, "weapon", item_id, item["price"])
-        await callback.answer(result, show_alert=True)
+        await buy_item(user_id, "weapon", item_id, item["price"], callback.message)
     
     elif data.startswith("buy_armor_"):
         item_id = int(data.split("_")[2])
         item = ARMORS[item_id]
-        success, result = await buy_item(user_id, "armor", item_id, item["price"])
-        await callback.answer(result, show_alert=True)
+        await buy_item(user_id, "armor", item_id, item["price"], callback.message)
     
     elif data.startswith("buy_potion_"):
         potion_id = data.split("_")[2]
         item = POTIONS[potion_id]
-        success, result = await buy_item(user_id, "potion", potion_id, item["price"])
-        await callback.answer(result, show_alert=True)
+        await buy_item(user_id, "potion", potion_id, item["price"], callback.message)
     
     # ИНВЕНТАРЬ
     elif data == "my_inventory":
@@ -988,8 +896,7 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
     
     elif data.startswith("equip_weapon_"):
         wid = int(data.split("_")[2])
-        success, result = await equip_item(user_id, "weapon", wid)
-        await callback.answer(result, show_alert=True)
+        await equip_item(user_id, "weapon", wid, callback.message)
     
     elif data == "equip_armor":
         async with aiosqlite.connect(DB_PATH) as db:
@@ -1009,8 +916,7 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
     
     elif data.startswith("equip_armor_"):
         aid = int(data.split("_")[2])
-        success, result = await equip_item(user_id, "armor", aid)
-        await callback.answer(result, show_alert=True)
+        await equip_item(user_id, "armor", aid, callback.message)
     
     elif data == "equip_artifact":
         async with aiosqlite.connect(DB_PATH) as db:
@@ -1030,8 +936,7 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
     
     elif data.startswith("equip_artifact_"):
         aid = int(data.split("_")[2])
-        success, result = await equip_item(user_id, "artifact", aid)
-        await callback.answer(result, show_alert=True)
+        await equip_item(user_id, "artifact", aid, callback.message)
     
     # ХАРАКТЕРИСТИКИ
     elif data == "my_stats_rpg":
@@ -1081,17 +986,7 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
     
     elif data.startswith("use_potion_"):
         potion_id = data.split("_")[2]
-        success, result = await use_potion(user_id, potion_id)
-        await callback.answer(result, show_alert=True)
-        if success:
-            stats = await get_player_stats(user_id)
-            await callback.message.edit_text(
-                f"⚔️ **RPG РАЗДЕЛ** ⚔️\n\n"
-                f"❤️ HP: {stats['hp']}/{stats['max_hp']}\n\n"
-                f"Выберите действие:",
-                reply_markup=get_rpg_keyboard(),
-                parse_mode="Markdown"
-            )
+        await use_potion(user_id, potion_id, callback.message)
     
     # ОБМЕН ВАЛЮТЫ
     elif data == "exchange_rpg":
