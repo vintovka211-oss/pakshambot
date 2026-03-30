@@ -1,5 +1,5 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from config import BET_BUTTONS, WEAPONS, ARMORS, POTIONS, BOSSES
+from config import BET_BUTTONS, WEAPONS, ARMORS, POTIONS, BOSSES, CAVES, EVENTS
 
 def get_main_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -134,7 +134,7 @@ def get_baccarat_choice_keyboard(bet):
 def get_rpg_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="⚔️ Сразиться с боссом", callback_data="fight_boss")],
-        [InlineKeyboardButton(text="⛏️ Пойти в пещеру", callback_data="cave")],
+        [InlineKeyboardButton(text="⛏️ Пойти в пещеру", callback_data="cave_menu")],
         [InlineKeyboardButton(text="🗡️ Кузнец", callback_data="forge")],
         [InlineKeyboardButton(text="🛡️ Мой инвентарь", callback_data="my_inventory")],
         [InlineKeyboardButton(text="📊 Мои характеристики", callback_data="my_stats_rpg")],
@@ -146,19 +146,17 @@ def get_rpg_keyboard():
 def get_boss_keyboard():
     kb = InlineKeyboardMarkup(inline_keyboard=[])
     for bid, boss in BOSSES.items():
-        kb.inline_keyboard.append([InlineKeyboardButton(text=f"{boss['icon']} {boss['name']} (HP: {boss['hp']})", callback_data=f"boss_{bid}")])
+        kb.inline_keyboard.append([InlineKeyboardButton(text=f"{boss['icon']} {boss['name']} (Lv.{boss['min_level']})", callback_data=f"boss_{bid}")])
     kb.inline_keyboard.append([InlineKeyboardButton(text="◀️ Назад", callback_data="rpg_menu")])
     return kb
 
 def get_fight_keyboard(fight_data):
-    """Клавиатура для боя с боссом"""
     boss_id = fight_data["boss_id"]
     player_hp = fight_data["player_hp"]
     boss_hp = fight_data["boss_hp"]
     player_attack = fight_data["player_attack"]
     boss_attack = fight_data["boss_attack"]
     
-    # Кодируем все данные в callback_data
     data_str = f"{boss_id}|{player_hp}|{boss_hp}|{player_attack}|{boss_attack}"
     
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -166,6 +164,25 @@ def get_fight_keyboard(fight_data):
         [InlineKeyboardButton(text="🧪 Использовать зелье", callback_data=f"fight_heal_{data_str}")],
         [InlineKeyboardButton(text="🏃 Сбежать", callback_data="rpg_menu")],
     ])
+
+def get_cave_keyboard():
+    kb = InlineKeyboardMarkup(inline_keyboard=[])
+    for level, cave in CAVES.items():
+        kb.inline_keyboard.append([InlineKeyboardButton(text=f"{cave['name']} ({cave['hp_cost']} HP)", callback_data=f"cave_{level}")])
+    kb.inline_keyboard.append([InlineKeyboardButton(text="◀️ Назад", callback_data="rpg_menu")])
+    return kb
+
+def get_cave_duration_keyboard(cave_level):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="⏱️ 5 минут", callback_data=f"cave_time_{cave_level}_5")],
+        [InlineKeyboardButton(text="⏱️ 15 минут", callback_data=f"cave_time_{cave_level}_15")],
+        [InlineKeyboardButton(text="⏱️ 30 минут", callback_data=f"cave_time_{cave_level}_30")],
+        [InlineKeyboardButton(text="⏱️ 60 минут", callback_data=f"cave_time_{cave_level}_60")],
+        [InlineKeyboardButton(text="⏱️ 120 минут", callback_data=f"cave_time_{cave_level}_120")],
+        [InlineKeyboardButton(text="⏱️ 240 минут", callback_data=f"cave_time_{cave_level}_240")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="cave_menu")]
+    ])
+
 def get_shop_keyboard():
     kb = InlineKeyboardMarkup(inline_keyboard=[])
     for wid, weapon in WEAPONS.items():
