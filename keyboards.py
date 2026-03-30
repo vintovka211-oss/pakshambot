@@ -154,6 +154,7 @@ def get_boss_keyboard():
     return kb
 
 def get_fight_keyboard(user_id):
+    """Клавиатура для боя с боссом"""
     from rpg import active_fights
     fight_data = active_fights.get(user_id)
     if not fight_data:
@@ -164,7 +165,7 @@ def get_fight_keyboard(user_id):
         [InlineKeyboardButton(text="🧪 Использовать зелье", callback_data="fight_heal")],
         [InlineKeyboardButton(text="🏃 Сбежать", callback_data="rpg_menu")],
     ])
-
+    
 def get_cave_keyboard():
     kb = InlineKeyboardMarkup(inline_keyboard=[])
     for level, cave in CAVES.items():
