@@ -113,7 +113,7 @@ async def sell_ore(user_id, ore_id, quantity, message):
     await message.edit_text(f"💰 Вы продали {quantity} {ore['icon']} {ore['name']} за {total_value} {RPG_COIN_NAME}!", reply_markup=get_back_keyboard())
     return True
 
-# ==================== БОЙ С БОССОМ ====================
+# ==================== БОЙ С БОССОМ (ИСПРАВЛЕННАЯ ВЕРСИЯ) ====================
 async def fight_boss_start(user_id, boss_id, message):
     stats = await get_player_stats(user_id)
     user = await get_user(user_id)
@@ -146,7 +146,8 @@ async def fight_boss_start(user_id, boss_id, message):
         "boss_hp": boss_hp,
         "player_attack": player_attack,
         "boss_attack": boss_attack,
-        "message_id": message.message_id
+        "message_id": message.message_id,
+        "last_update": datetime.now().isoformat()
     }
     
     active_fights[user_id] = fight_data
@@ -165,12 +166,13 @@ async def fight_boss_start(user_id, boss_id, message):
     return True
 
 async def fight_attack(user_id, callback, message):
+    # Проверяем, есть ли активный бой
     if user_id not in active_fights:
         await message.edit_text("❌ Бой не найден! Начните новый бой.", reply_markup=get_back_keyboard())
         return "error"
     
+    # Получаем текущие данные боя
     current_fight = active_fights[user_id]
-    
     boss_id = current_fight["boss_id"]
     player_hp = current_fight["player_hp"]
     boss_hp = current_fight["boss_hp"]
@@ -179,11 +181,19 @@ async def fight_attack(user_id, callback, message):
     
     boss = BOSSES.get(boss_id)
     
+    # Игрок атакует
     damage = player_attack + random.randint(-5, 5)
-    boss_hp -= damage
+    new_boss_hp = boss_hp - damage
     damage_text = f"🗡️ Вы нанесли {damage} урона!"
     
-    if boss_hp <= 0:
+    # Обновляем данные боя
+    current_fight["boss_hp"] = new_boss_hp
+    current_fight["last_update"] = datetime.now().isoformat()
+    active_fights[user_id] = current_fight
+    
+    # Проверяем, победили ли босса
+    if new_boss_hp <= 0:
+        # Победа!
         rpg_reward = boss["rpg_reward"]
         exp_gain = boss["exp"]
         
@@ -203,6 +213,7 @@ async def fight_attack(user_id, callback, message):
         await update_user(user_id, rpg_balance=new_rpg)
         await add_transaction(user_id, "boss_fight", rpg_reward, f"Победа над {boss['name']}")
         
+        # Ресурсы
         reward_text = ""
         resource_rewards = []
         for res_name, res_data in ORES.items():
@@ -218,6 +229,7 @@ async def fight_attack(user_id, callback, message):
         if resource_rewards:
             reward_text += "\n📦 **Ресурсы:**\n" + "\n".join([f"{ORES[r]['icon']} {q} {ORES[r]['name']}" for r, q in resource_rewards])
         
+        # Артефакт
         artifact_chance = {"common": 10, "rare": 20, "epic": 30, "legendary": 40, "mythic": 50, "legend": 60, "god": 70}
         chance = artifact_chance.get(boss["tier"], 10)
         
@@ -232,6 +244,7 @@ async def fight_attack(user_id, callback, message):
                     await db.commit()
                 reward_text += f"\n🎁 **Артефакт:** {artifact['icon']} {artifact['name']}!"
         
+        # Удаляем бой из активных
         if user_id in active_fights:
             del active_fights[user_id]
         
@@ -246,13 +259,19 @@ async def fight_attack(user_id, callback, message):
         )
         return "win"
     
+    # Босс атакует в ответ
     boss_damage = boss_attack + random.randint(-3, 3)
-    player_hp -= boss_damage
+    new_player_hp = player_hp - boss_damage
     damage_text += f"\n⚔️ Босс нанёс {boss_damage} урона!"
     
-    if player_hp <= 0:
+    # Обновляем HP игрока
+    current_fight["player_hp"] = new_player_hp
+    active_fights[user_id] = current_fight
+    
+    # Проверяем, не умер ли игрок
+    if new_player_hp <= 0:
         stats = await get_player_stats(user_id)
-        await update_player_stats(user_id, hp=player_hp, deaths=stats["deaths"] + 1)
+        await update_player_stats(user_id, hp=new_player_hp, deaths=stats["deaths"] + 1)
         
         if user_id in active_fights:
             del active_fights[user_id]
@@ -260,20 +279,18 @@ async def fight_attack(user_id, callback, message):
         await message.edit_text(
             f"💀 **ПОРАЖЕНИЕ!** 💀\n\n"
             f"{boss['icon']} {boss['name']} победил вас!\n"
-            f"💔 У вас осталось {player_hp} HP",
+            f"💔 У вас осталось {new_player_hp} HP",
             reply_markup=get_back_keyboard(),
             parse_mode="Markdown"
         )
         return "lose"
     
-    current_fight["player_hp"] = player_hp
-    current_fight["boss_hp"] = boss_hp
-    
+    # Продолжаем бой
     from keyboards import get_fight_keyboard
     await message.edit_text(
         f"⚔️ **Бой с {boss['name']}** ⚔️\n\n"
-        f"❤️ Ваше HP: {player_hp}\n"
-        f"💀 HP босса: {boss_hp}\n"
+        f"❤️ Ваше HP: {new_player_hp}\n"
+        f"💀 HP босса: {new_boss_hp}\n"
         f"🗡️ Ваша атака: {player_attack}\n"
         f"⚔️ Атака босса: {boss_attack}\n\n"
         f"{damage_text}\n\n"
@@ -284,12 +301,12 @@ async def fight_attack(user_id, callback, message):
     return "continue"
 
 async def fight_heal(user_id, callback, message):
+    # Проверяем, есть ли активный бой
     if user_id not in active_fights:
         await message.edit_text("❌ Бой не найден! Начните новый бой.", reply_markup=get_back_keyboard())
         return "error"
     
     current_fight = active_fights[user_id]
-    
     boss_id = current_fight["boss_id"]
     player_hp = current_fight["player_hp"]
     boss_hp = current_fight["boss_hp"]
@@ -299,6 +316,7 @@ async def fight_heal(user_id, callback, message):
     boss = BOSSES.get(boss_id)
     stats = await get_player_stats(user_id)
     
+    # Проверяем наличие зелья
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute("SELECT quantity FROM inventory WHERE user_id = ? AND item_type = 'potion' AND item_id = 'small'", (user_id,)) as cursor:
             result = await cursor.fetchone()
@@ -307,6 +325,7 @@ async def fight_heal(user_id, callback, message):
         await message.edit_text("❌ У вас нет зелий! Купите в магазине.", reply_markup=get_back_keyboard())
         return "no_potion"
     
+    # Лечимся
     heal_amount = 20 + random.randint(-5, 10)
     new_hp = min(player_hp + heal_amount, stats["max_hp"])
     
@@ -314,7 +333,9 @@ async def fight_heal(user_id, callback, message):
         await db.execute("UPDATE inventory SET quantity = quantity - 1 WHERE user_id = ? AND item_type = 'potion' AND item_id = 'small'", (user_id,))
         await db.commit()
     
+    # Обновляем данные боя
     current_fight["player_hp"] = new_hp
+    active_fights[user_id] = current_fight
     
     from keyboards import get_fight_keyboard
     await message.edit_text(
