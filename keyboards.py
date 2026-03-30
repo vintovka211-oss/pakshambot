@@ -19,22 +19,11 @@ def get_main_keyboard():
 
 def get_games_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎰 Слоты", callback_data="game_slots"),
-         InlineKeyboardButton(text="🎲 Кубик", callback_data="game_dice")],
-        [InlineKeyboardButton(text="🎡 Рулетка", callback_data="game_roulette"),
-         InlineKeyboardButton(text="🃏 Блэкджек", callback_data="game_blackjack")],
-        [InlineKeyboardButton(text="💣 Мины", callback_data="game_mines"),
-         InlineKeyboardButton(text="🎡 Колесо", callback_data="game_wheel")],
-        [InlineKeyboardButton(text="🪙 Орёл/Решка", callback_data="game_coin"),
-         InlineKeyboardButton(text="🥢 Палки", callback_data="game_sticks")],
-        [InlineKeyboardButton(text="📈 Больше-Меньше", callback_data="game_highlow"),
-         InlineKeyboardButton(text="🎲 Кено", callback_data="game_keno")],
-        [InlineKeyboardButton(text="🃏 Баккара", callback_data="game_baccarat"),
-         InlineKeyboardButton(text="🃏 Покер", callback_data="game_poker")],
-        [InlineKeyboardButton(text="🎲 Крэпс", callback_data="game_craps"),
-         InlineKeyboardButton(text="🎰 Видео-покер", callback_data="game_video_poker")],
-        [InlineKeyboardButton(text="7️⃣ Лакки 7", callback_data="game_lucky7"),
-         InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")],
+        [InlineKeyboardButton(text="🎲 Кубик (чёт/нечёт)", callback_data="game_dice")],
+        [InlineKeyboardButton(text="🪙 Орёл/Решка", callback_data="game_coin")],
+        [InlineKeyboardButton(text="💣 Мины 5x5", callback_data="game_mines")],
+        [InlineKeyboardButton(text="🗼 Башня", callback_data="game_tower")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")],
     ])
 
 def get_bet_keyboard(game):
@@ -51,22 +40,9 @@ def get_bet_keyboard(game):
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def get_dice_choice_keyboard(bet):
-    buttons = []
-    row = []
-    for i in range(1, 7):
-        row.append(InlineKeyboardButton(text=str(i), callback_data=f"dice_choice_{i}_{bet}"))
-        if len(row) == 3:
-            buttons.append(row)
-            row = []
-    if row:
-        buttons.append(row)
-    buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="games")])
-    return InlineKeyboardMarkup(inline_keyboard=buttons)
-
-def get_roulette_choice_keyboard(bet):
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔴 Красное", callback_data=f"roulette_choice_🔴_{bet}"),
-         InlineKeyboardButton(text="⚫ Чёрное", callback_data=f"roulette_choice_⚫_{bet}")],
+        [InlineKeyboardButton(text="🎲 ЧЁТ", callback_data=f"dice_choice_even_{bet}"),
+         InlineKeyboardButton(text="🎲 НЕЧЁТ", callback_data=f"dice_choice_odd_{bet}")],
         [InlineKeyboardButton(text="◀️ Назад", callback_data="games")]
     ])
 
@@ -77,59 +53,39 @@ def get_coin_choice_keyboard(bet):
         [InlineKeyboardButton(text="◀️ Назад", callback_data="games")]
     ])
 
-def get_mines_choice_keyboard(bet):
+def get_mines_field_keyboard(game_data):
+    """Клавиатура для поля 5x5 в минах"""
     buttons = []
-    row = []
-    for i in range(1, 10):
-        row.append(InlineKeyboardButton(text=str(i), callback_data=f"mines_choice_{i}_{bet}"))
-        if len(row) == 3:
-            buttons.append(row)
-            row = []
-    if row:
+    field = game_data["field"]
+    opened = game_data["opened"]
+    
+    for i in range(5):
+        row = []
+        for j in range(5):
+            cell = i * 5 + j
+            if cell in opened:
+                text = "✅"
+            else:
+                text = f"⬜"
+            row.append(InlineKeyboardButton(text=text, callback_data=f"mines_cell_{cell}"))
         buttons.append(row)
+    
+    buttons.append([InlineKeyboardButton(text="💰 Забрать выигрыш", callback_data=f"mines_cashout_{game_data['bet']}_{game_data['multiplier']}")])
     buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="games")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-def get_sticks_choice_keyboard(bet):
+def get_tower_level_keyboard(game_data):
+    """Клавиатура для уровня башни"""
     buttons = []
     row = []
-    for i in range(1, 11):
-        row.append(InlineKeyboardButton(text=str(i), callback_data=f"sticks_choice_{i}_{bet}"))
+    for i in range(5):
+        row.append(InlineKeyboardButton(text=f"🟩 {i+1}", callback_data=f"tower_choice_{i}"))
         if len(row) == 5:
             buttons.append(row)
             row = []
-    if row:
-        buttons.append(row)
+    buttons.append([InlineKeyboardButton(text="💰 Забрать выигрыш", callback_data=f"tower_cashout_{game_data['bet']}_{game_data['multiplier']}")])
     buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="games")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
-
-def get_highlow_choice_keyboard(bet):
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📈 Больше 50", callback_data=f"highlow_choice_high_{bet}"),
-         InlineKeyboardButton(text="📉 Меньше 50", callback_data=f"highlow_choice_low_{bet}")],
-        [InlineKeyboardButton(text="◀️ Назад", callback_data="games")]
-    ])
-
-def get_keno_choice_keyboard(bet):
-    buttons = []
-    row = []
-    for i in range(1, 21):
-        row.append(InlineKeyboardButton(text=str(i), callback_data=f"keno_choice_{i}_{bet}"))
-        if len(row) == 5:
-            buttons.append(row)
-            row = []
-    if row:
-        buttons.append(row)
-    buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="games")])
-    return InlineKeyboardMarkup(inline_keyboard=buttons)
-
-def get_baccarat_choice_keyboard(bet):
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="👤 Игрок", callback_data=f"baccarat_choice_player_{bet}"),
-         InlineKeyboardButton(text="🏦 Банкир", callback_data=f"baccarat_choice_banker_{bet}")],
-        [InlineKeyboardButton(text="🤝 Ничья", callback_data=f"baccarat_choice_tie_{bet}")],
-        [InlineKeyboardButton(text="◀️ Назад", callback_data="games")]
-    ])
 
 def get_rpg_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -154,7 +110,6 @@ def get_boss_keyboard():
     return kb
 
 def get_fight_keyboard(user_id):
-    """Клавиатура для боя с боссом"""
     from rpg import active_fights
     fight_data = active_fights.get(user_id)
     if not fight_data:
@@ -165,7 +120,7 @@ def get_fight_keyboard(user_id):
         [InlineKeyboardButton(text="🧪 Использовать зелье", callback_data="fight_heal")],
         [InlineKeyboardButton(text="🏃 Сбежать", callback_data="rpg_menu")],
     ])
-    
+
 def get_cave_keyboard():
     kb = InlineKeyboardMarkup(inline_keyboard=[])
     for level, cave in CAVES.items():
@@ -179,7 +134,6 @@ def get_cave_duration_keyboard(cave_level):
         [InlineKeyboardButton(text="⏱️ 15 минут", callback_data=f"cave_time_{cave_level}_15")],
         [InlineKeyboardButton(text="⏱️ 30 минут", callback_data=f"cave_time_{cave_level}_30")],
         [InlineKeyboardButton(text="⏱️ 60 минут", callback_data=f"cave_time_{cave_level}_60")],
-        [InlineKeyboardButton(text="⏱️ 120 минут", callback_data=f"cave_time_{cave_level}_120")],
         [InlineKeyboardButton(text="◀️ Назад", callback_data="cave_menu")]
     ])
 
@@ -193,6 +147,13 @@ def get_shop_keyboard():
         kb.inline_keyboard.append([InlineKeyboardButton(text=f"{potion['icon']} {potion['name']} - {potion['price']} 🪙", callback_data=f"buy_potion_{pid}")])
     kb.inline_keyboard.append([InlineKeyboardButton(text="◀️ Назад", callback_data="rpg_menu")])
     return kb
+
+def get_payment_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💳 СБП (по номеру телефона)", callback_data="pay_sbp")],
+        [InlineKeyboardButton(text="🪙 CryptoBot (криптовалюта)", callback_data="pay_crypto")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]
+    ])
 
 def get_back_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
