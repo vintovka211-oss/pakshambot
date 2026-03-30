@@ -279,7 +279,7 @@ async def play_blackjack(user_id, bet):
     else:
         return 0, f"🃏 **Блэкджек**\n\n**Ваши карты:** {player_cards} = {player_sum}\n**Карты дилера:** {dealer_cards} = {dealer_sum}\n\n😔 Вы проиграли {bet} {COIN_NAME}."
 
-# ОСТАЛЬНЫЕ ИГРЫ (упрощённые)
+# ПАЛКИ
 async def play_sticks(user_id, bet, choice):
     user = await get_user(user_id)
     if bet <= 0:
@@ -304,6 +304,7 @@ async def play_sticks(user_id, bet, choice):
     else:
         return 0, f"🥢 **Палки**\n\nВыпало: **{sticks}**\nВаше число: **{choice}**\n\n😔 Вы не угадали. -{bet} {COIN_NAME}."
 
+# БОЛЬШЕ-МЕНЬШЕ
 async def play_high_low(user_id, bet, choice):
     user = await get_user(user_id)
     if bet <= 0:
@@ -331,6 +332,7 @@ async def play_high_low(user_id, bet, choice):
     else:
         return 0, f"📉 **Больше-Меньше**\n\nВыпало: **{number}**\n\n😔 Вы проиграли {bet} {COIN_NAME}."
 
+# КЕНО
 async def play_keno(user_id, bet, choice):
     user = await get_user(user_id)
     if bet <= 0:
@@ -355,6 +357,7 @@ async def play_keno(user_id, bet, choice):
     else:
         return 0, f"🎲 **Кено**\n\nВыпавшие числа: {numbers[:5]}...\nВаше число: **{choice}**\n\n😔 Вы не угадали. -{bet} {COIN_NAME}."
 
+# БАККАРА
 async def play_baccarat(user_id, bet, choice):
     user = await get_user(user_id)
     if bet <= 0:
@@ -385,6 +388,7 @@ async def play_baccarat(user_id, bet, choice):
     else:
         return 0, f"🃏 **Баккара**\n\nИгрок: **{player}** | Банкир: **{banker}**\n\n😔 Вы проиграли {bet} {COIN_NAME}."
 
+# ПОКЕР
 async def play_poker(user_id, bet):
     user = await get_user(user_id)
     if bet <= 0:
@@ -408,6 +412,7 @@ async def play_poker(user_id, bet):
     else:
         return 0, f"🃏 **Покер**\n\n😔 Вы проиграли {bet} {COIN_NAME}."
 
+# КРЭПС
 async def play_craps(user_id, bet):
     user = await get_user(user_id)
     if bet <= 0:
@@ -434,6 +439,7 @@ async def play_craps(user_id, bet):
     else:
         return 0, f"🎲 **Крэпс**\n\nКости: **{dice1}** + **{dice2}** = **{total}**\n\n😔 Вы проиграли {bet} {COIN_NAME}."
 
+# ВИДЕО-ПОКЕР
 async def play_video_poker(user_id, bet):
     user = await get_user(user_id)
     if bet <= 0:
@@ -457,6 +463,7 @@ async def play_video_poker(user_id, bet):
     else:
         return 0, f"🎰 **Видео-покер**\n\n😔 Вы проиграли {bet} {COIN_NAME}."
 
+# ЛАККИ 7
 async def play_lucky7(user_id, bet):
     user = await get_user(user_id)
     if bet <= 0:
