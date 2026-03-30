@@ -1,11 +1,9 @@
 import random
-import asyncio
 import aiosqlite
-from datetime import datetime, timedelta
+from datetime import datetime
 from config import CLAN_CREATE_PRICE, CLAN_MAX_MEMBERS, CLAN_LEVELS, CLAN_BOSSES, RPG_COIN_NAME, WEAPONS
 from database import get_user, update_user, add_transaction, get_player_stats, DB_PATH
 
-# ==================== КЛАНЫ ====================
 async def get_clan(clan_id):
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute("SELECT * FROM clans WHERE id = ?", (clan_id,)) as cursor:
@@ -105,7 +103,6 @@ async def disband_clan(user_id):
         
         return True, f"✅ Клан **{clan['name']}** распущен!"
 
-# ==================== КЛАНОВЫЙ БОСС ====================
 async def start_clan_boss(clan_id):
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute("SELECT id FROM clan_boss_fights WHERE clan_id = ?", (clan_id,)) as cursor:
@@ -180,7 +177,6 @@ async def update_clan_exp(clan_id, new_exp):
             await db.execute("UPDATE clans SET exp = ? WHERE id = ?", (new_exp, clan_id))
             return False, ""
 
-# ==================== ИНФОРМАЦИЯ О КЛАНЕ ====================
 async def get_clan_info(clan_id):
     clan = await get_clan(clan_id)
     if not clan:
