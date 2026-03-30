@@ -37,7 +37,8 @@ async def init_db():
                 armor_upgrade INTEGER DEFAULT 0,
                 kills INTEGER DEFAULT 0,
                 deaths INTEGER DEFAULT 0,
-                tool_level INTEGER DEFAULT 1
+                tool_level INTEGER DEFAULT 1,
+                achievements TEXT DEFAULT '{}'
             )
         ''')
         await db.execute('''
@@ -106,7 +107,6 @@ async def update_player_stats(user_id, **kwargs):
             await db.execute(f"UPDATE player_stats SET {key} = ? WHERE user_id = ?", (value, user_id))
         await db.commit()
 
-# ==================== ТОП-10 ====================
 async def get_top_players():
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute("SELECT user_id, username, kills FROM player_stats ORDER BY kills DESC LIMIT 10") as cursor:
@@ -184,7 +184,6 @@ async def upgrade_mine(user_id):
 async def claim_daily_bonus(user_id):
     user = await get_user(user_id)
     
-    # Проверяем, получал ли бонус сегодня
     if user.get("last_daily"):
         last = datetime.fromisoformat(user["last_daily"]) if isinstance(user["last_daily"], str) else user["last_daily"]
         if (datetime.now() - last).days < 1:
