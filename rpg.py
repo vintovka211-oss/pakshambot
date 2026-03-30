@@ -13,24 +13,27 @@ async def get_tool(user_id):
     tool_level = stats.get("tool_level", 1)
     return TOOLS.get(tool_level, TOOLS[1])
 
-async def upgrade_tool(user_id):
+async def upgrade_tool(user_id, message):
     stats = await get_player_stats(user_id)
     user = await get_user(user_id)
     
     current_level = stats.get("tool_level", 1)
     if current_level >= len(TOOLS):
-        return False, "🏆 У вас уже максимальный инструмент!"
+        await message.edit_text("🏆 У вас уже максимальный инструмент!", reply_markup=get_back_keyboard())
+        return False
     
     next_tool = TOOLS[current_level + 1]
     cost = next_tool["price"]
     
     if user["rpg_balance"] < cost:
-        return False, f"❌ Недостаточно {RPG_COIN_NAME}! Нужно {cost}"
+        await message.edit_text(f"❌ Недостаточно {RPG_COIN_NAME}! Нужно {cost}", reply_markup=get_back_keyboard())
+        return False
     
     await update_user(user_id, rpg_balance=user["rpg_balance"] - cost)
     await update_player_stats(user_id, tool_level=current_level + 1)
     await add_transaction(user_id, "tool_upgrade", -cost, f"Улучшение инструмента до {next_tool['name']}")
-    return True, f"✅ Инструмент улучшен до {next_tool['name']}!"
+    await message.edit_text(f"✅ Инструмент улучшен до {next_tool['name']}!", reply_markup=get_back_keyboard())
+    return True
 
 # ==================== ДОБЫЧА В ПЕЩЕРЕ ====================
 async def go_to_cave(user_id, cave_level, duration_minutes, message):
@@ -40,11 +43,11 @@ async def go_to_cave(user_id, cave_level, duration_minutes, message):
     
     if tool["level"] < cave["required_tool"]:
         required_tool = TOOLS[cave["required_tool"]]["name"]
-        await message.edit_text(f"❌ Для этой пещеры нужен {required_tool}! Ваш инструмент: {tool['name']}", reply_markup=get_back_keyboard(), parse_mode="Markdown")
+        await message.edit_text(f"❌ Для этой пещеры нужен {required_tool}! Ваш инструмент: {tool['name']}", reply_markup=get_back_keyboard())
         return False
     
     if user_id in active_mining:
-        await message.edit_text("⏳ Вы уже добываете ресурсы! Подождите окончания.", reply_markup=get_back_keyboard(), parse_mode="Markdown")
+        await message.edit_text("⏳ Вы уже добываете ресурсы! Подождите окончания.", reply_markup=get_back_keyboard())
         return False
     
     task = asyncio.create_task(mine_in_background(user_id, cave_level, duration_minutes, tool["level"]))
@@ -52,8 +55,7 @@ async def go_to_cave(user_id, cave_level, duration_minutes, message):
     
     await message.edit_text(
         f"⛏️ **{cave['name']}**\n\nВы отправились добывать ресурсы!\n🔧 Инструмент: {tool['name']}\n⏱️ Время: {duration_minutes} минут\n\n💰 Ресурсы появятся в инвентаре через {duration_minutes} минут!",
-        reply_markup=get_back_keyboard(),
-        parse_mode="Markdown"
+        reply_markup=get_back_keyboard()
     )
     return True
 
@@ -157,14 +159,14 @@ async def fight_boss_start(user_id, boss_id, message):
         f"🗡️ Ваша атака: {player_attack}\n"
         f"⚔️ Атака босса: {boss_attack}\n\n"
         f"Выберите действие:",
-        reply_markup=get_fight_keyboard(fight_data),
+        reply_markup=get_fight_keyboard(user_id),
         parse_mode="Markdown"
     )
     return True
 
-async def fight_attack(user_id, callback, fight_data):
+async def fight_attack(user_id, callback, message):
     if user_id not in active_fights:
-        await callback.message.edit_text("❌ Бой не найден! Начните новый бой.", reply_markup=get_back_keyboard())
+        await message.edit_text("❌ Бой не найден! Начните новый бой.", reply_markup=get_back_keyboard())
         return "error"
     
     current_fight = active_fights[user_id]
@@ -177,13 +179,11 @@ async def fight_attack(user_id, callback, fight_data):
     
     boss = BOSSES.get(boss_id)
     
-    # Игрок атакует
     damage = player_attack + random.randint(-5, 5)
     boss_hp -= damage
     damage_text = f"🗡️ Вы нанесли {damage} урона!"
     
     if boss_hp <= 0:
-        # Победа!
         rpg_reward = boss["rpg_reward"]
         exp_gain = boss["exp"]
         
@@ -235,7 +235,7 @@ async def fight_attack(user_id, callback, fight_data):
         if user_id in active_fights:
             del active_fights[user_id]
         
-        await callback.message.edit_text(
+        await message.edit_text(
             f"🎉 **ПОБЕДА!** 🎉\n\n"
             f"Вы победили {boss['icon']} {boss['name']}!\n"
             f"🪙 Награда: +{rpg_reward} {RPG_COIN_NAME}\n"
@@ -246,7 +246,6 @@ async def fight_attack(user_id, callback, fight_data):
         )
         return "win"
     
-    # Босс атакует в ответ
     boss_damage = boss_attack + random.randint(-3, 3)
     player_hp -= boss_damage
     damage_text += f"\n⚔️ Босс нанёс {boss_damage} урона!"
@@ -258,7 +257,7 @@ async def fight_attack(user_id, callback, fight_data):
         if user_id in active_fights:
             del active_fights[user_id]
         
-        await callback.message.edit_text(
+        await message.edit_text(
             f"💀 **ПОРАЖЕНИЕ!** 💀\n\n"
             f"{boss['icon']} {boss['name']} победил вас!\n"
             f"💔 У вас осталось {player_hp} HP",
@@ -267,12 +266,11 @@ async def fight_attack(user_id, callback, fight_data):
         )
         return "lose"
     
-    # Обновляем данные боя
     current_fight["player_hp"] = player_hp
     current_fight["boss_hp"] = boss_hp
     
     from keyboards import get_fight_keyboard
-    await callback.message.edit_text(
+    await message.edit_text(
         f"⚔️ **Бой с {boss['name']}** ⚔️\n\n"
         f"❤️ Ваше HP: {player_hp}\n"
         f"💀 HP босса: {boss_hp}\n"
@@ -280,14 +278,14 @@ async def fight_attack(user_id, callback, fight_data):
         f"⚔️ Атака босса: {boss_attack}\n\n"
         f"{damage_text}\n\n"
         f"Выберите действие:",
-        reply_markup=get_fight_keyboard(current_fight),
+        reply_markup=get_fight_keyboard(user_id),
         parse_mode="Markdown"
     )
     return "continue"
 
-async def fight_heal(user_id, callback, fight_data):
+async def fight_heal(user_id, callback, message):
     if user_id not in active_fights:
-        await callback.message.edit_text("❌ Бой не найден! Начните новый бой.", reply_markup=get_back_keyboard())
+        await message.edit_text("❌ Бой не найден! Начните новый бой.", reply_markup=get_back_keyboard())
         return "error"
     
     current_fight = active_fights[user_id]
@@ -306,7 +304,7 @@ async def fight_heal(user_id, callback, fight_data):
             result = await cursor.fetchone()
     
     if not result or result[0] <= 0:
-        await callback.message.edit_text("❌ У вас нет зелий! Купите в магазине.", reply_markup=get_back_keyboard())
+        await message.edit_text("❌ У вас нет зелий! Купите в магазине.", reply_markup=get_back_keyboard())
         return "no_potion"
     
     heal_amount = 20 + random.randint(-5, 10)
@@ -319,7 +317,7 @@ async def fight_heal(user_id, callback, fight_data):
     current_fight["player_hp"] = new_hp
     
     from keyboards import get_fight_keyboard
-    await callback.message.edit_text(
+    await message.edit_text(
         f"⚔️ **Бой с {boss['name']}** ⚔️\n\n"
         f"❤️ Ваше HP: {new_hp}\n"
         f"💀 HP босса: {boss_hp}\n"
@@ -327,7 +325,7 @@ async def fight_heal(user_id, callback, fight_data):
         f"⚔️ Атака босса: {boss_attack}\n\n"
         f"🧪 Вы использовали зелье! +{heal_amount} HP\n\n"
         f"Выберите действие:",
-        reply_markup=get_fight_keyboard(current_fight),
+        reply_markup=get_fight_keyboard(user_id),
         parse_mode="Markdown"
     )
     return "healed"
