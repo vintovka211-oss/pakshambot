@@ -1,5 +1,5 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from config import BET_BUTTONS, WEAPONS, ARMORS, POTIONS, BOSSES, CAVES, ORES
+from config import BET_BUTTONS, WEAPONS, ARMORS, POTIONS, BOSSES, CAVES, ORES, TOOLS
 
 def get_main_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -153,18 +153,15 @@ def get_boss_keyboard():
     kb.inline_keyboard.append([InlineKeyboardButton(text="◀️ Назад", callback_data="rpg_menu")])
     return kb
 
-def get_fight_keyboard(fight_data):
-    boss_id = fight_data["boss_id"]
-    player_hp = fight_data["player_hp"]
-    boss_hp = fight_data["boss_hp"]
-    player_attack = fight_data["player_attack"]
-    boss_attack = fight_data["boss_attack"]
-    
-    data_str = f"{boss_id}|{player_hp}|{boss_hp}|{player_attack}|{boss_attack}"
+def get_fight_keyboard(user_id):
+    from rpg import active_fights
+    fight_data = active_fights.get(user_id)
+    if not fight_data:
+        return get_back_keyboard()
     
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="⚔️ Атаковать", callback_data=f"fight_attack_{data_str}")],
-        [InlineKeyboardButton(text="🧪 Использовать зелье", callback_data=f"fight_heal_{data_str}")],
+        [InlineKeyboardButton(text="⚔️ Атаковать", callback_data="fight_attack")],
+        [InlineKeyboardButton(text="🧪 Использовать зелье", callback_data="fight_heal")],
         [InlineKeyboardButton(text="🏃 Сбежать", callback_data="rpg_menu")],
     ])
 
