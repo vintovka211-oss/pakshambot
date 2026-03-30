@@ -1,12 +1,108 @@
 import random
 import asyncio
-from config import BOSSES, WEAPONS, ARMORS, POTIONS, ARTIFACTS, RESOURCES, CAVES, EVENTS, RPG_COIN_NAME
-from database import get_user, update_user, add_transaction, get_player_stats, update_player_stats
 import aiosqlite
+from config import BOSSES, WEAPONS, ARMORS, POTIONS, ARTIFACTS, ORES, CAVES, TOOLS, EVENTS, RPG_COIN_NAME, RESOURCES
+from database import get_user, update_user, add_transaction, get_player_stats, update_player_stats, DB_PATH
 
 active_fights = {}
 active_mining = {}
 
+# ==================== ИНСТРУМЕНТЫ ====================
+async def get_tool(user_id):
+    stats = await get_player_stats(user_id)
+    tool_level = stats.get("tool_level", 1)
+    return TOOLS.get(tool_level, TOOLS[1])
+
+async def upgrade_tool(user_id):
+    stats = await get_player_stats(user_id)
+    user = await get_user(user_id)
+    
+    current_level = stats.get("tool_level", 1)
+    if current_level >= len(TOOLS):
+        return False, "🏆 У вас уже максимальный инструмент!"
+    
+    next_tool = TOOLS[current_level + 1]
+    cost = next_tool["price"]
+    
+    if user["rpg_balance"] < cost:
+        return False, f"❌ Недостаточно {RPG_COIN_NAME}! Нужно {cost}"
+    
+    await update_user(user_id, rpg_balance=user["rpg_balance"] - cost)
+    await update_player_stats(user_id, tool_level=current_level + 1)
+    await add_transaction(user_id, "tool_upgrade", -cost, f"Улучшение инструмента до {next_tool['name']}")
+    return True, f"✅ Инструмент улучшен до {next_tool['name']}!"
+
+# ==================== ДОБЫЧА В ПЕЩЕРЕ ====================
+async def go_to_cave(user_id, cave_level, duration_minutes):
+    stats = await get_player_stats(user_id)
+    cave = CAVES.get(cave_level, CAVES[1])
+    tool = await get_tool(user_id)
+    
+    if tool["level"] < cave["required_tool"]:
+        required_tool = TOOLS[cave["required_tool"]]["name"]
+        return False, f"❌ Для этой пещеры нужен {required_tool}! Ваш инструмент: {tool['name']}"
+    
+    if user_id in active_mining:
+        return False, "⏳ Вы уже добываете ресурсы! Подождите окончания."
+    
+    task = asyncio.create_task(mine_in_background(user_id, cave_level, duration_minutes, tool["level"]))
+    active_mining[user_id] = task
+    
+    return True, f"⛏️ **{cave['name']}**\n\nВы отправились добывать ресурсы!\n🔧 Инструмент: {tool['name']}\n⏱️ Время: {duration_minutes} минут\n\n💰 Ресурсы появятся в инвентаре через {duration_minutes} минут!"
+
+async def mine_in_background(user_id, cave_level, duration_minutes, tool_level):
+    await asyncio.sleep(duration_minutes * 60)
+    
+    cave = CAVES.get(cave_level, CAVES[1])
+    resource_tiers = cave["tiers"]
+    tool = TOOLS.get(tool_level, TOOLS[1])
+    resources_gained = {}
+    
+    available_ores = [ore for ore_id, ore in ORES.items() if ore["tier"] in tool["can_mine"] and ore["tier"] in resource_tiers]
+    
+    for _ in range(random.randint(cave["min_resources"], cave["max_resources"])):
+        if available_ores:
+            ore = random.choice(available_ores)
+            ore_data = ORES[ore]
+            qty = random.randint(1, 3)
+            resources_gained[ore] = resources_gained.get(ore, 0) + qty
+    
+    async with aiosqlite.connect(DB_PATH) as db:
+        for res, qty in resources_gained.items():
+            await db.execute("INSERT INTO inventory (user_id, item_type, item_id, quantity) VALUES (?, 'ore', ?, ?) ON CONFLICT DO UPDATE SET quantity = quantity + ?", (user_id, res, qty, qty))
+        await db.commit()
+    
+    resource_text = "\n".join([f"{ORES[r]['icon']} {q} {ORES[r]['name']}" for r, q in resources_gained.items()]) if resources_gained else "Ничего не найдено..."
+    
+    from bot import bot
+    await bot.send_message(user_id, f"⛏️ **Добыча ресурсов завершена!**\n\nВы нашли:\n{resource_text}", parse_mode="Markdown")
+    
+    if user_id in active_mining:
+        del active_mining[user_id]
+
+# ==================== ПРОДАЖА РУДЫ ====================
+async def sell_ore(user_id, ore_id, quantity):
+    user = await get_user(user_id)
+    ore = ORES.get(ore_id)
+    
+    if not ore:
+        return False, "❌ Такой руды не существует!"
+    
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("SELECT quantity FROM inventory WHERE user_id = ? AND item_type = 'ore' AND item_id = ?", (user_id, ore_id)) as cursor:
+            result = await cursor.fetchone()
+            if not result or result[0] < quantity:
+                return False, f"❌ У вас нет {quantity} {ore['name']}!"
+            await db.execute("UPDATE inventory SET quantity = quantity - ? WHERE user_id = ? AND item_type = 'ore' AND item_id = ?", (quantity, user_id, ore_id))
+            await db.commit()
+    
+    total_value = ore["value"] * quantity
+    await update_user(user_id, rpg_balance=user["rpg_balance"] + total_value)
+    await add_transaction(user_id, "sell_ore", total_value, f"Продажа {quantity} {ore['name']}")
+    
+    return True, f"💰 Вы продали {quantity} {ore['icon']} {ore['name']} за {total_value} {RPG_COIN_NAME}!"
+
+# ==================== БОЙ С БОССОМ ====================
 async def fight_boss_start(user_id, boss_id, message):
     stats = await get_player_stats(user_id)
     user = await get_user(user_id)
@@ -57,15 +153,17 @@ async def fight_boss_start(user_id, boss_id, message):
     return True, fight_data
 
 async def fight_attack(user_id, callback, fight_data):
-    if user_id in active_fights and active_fights[user_id] != fight_data:
-        await callback.answer("⏳ Бой уже идёт!", show_alert=True)
-        return "wait"
+    if user_id not in active_fights:
+        await callback.answer("❌ Бой не найден! Начните новый бой.", show_alert=True)
+        return "error"
     
-    boss_id = fight_data["boss_id"]
-    player_hp = fight_data["player_hp"]
-    boss_hp = fight_data["boss_hp"]
-    player_attack = fight_data["player_attack"]
-    boss_attack = fight_data["boss_attack"]
+    current_fight = active_fights[user_id]
+    
+    boss_id = current_fight["boss_id"]
+    player_hp = current_fight["player_hp"]
+    boss_hp = current_fight["boss_hp"]
+    player_attack = current_fight["player_attack"]
+    boss_attack = current_fight["boss_attack"]
     
     boss = BOSSES.get(boss_id)
     
@@ -95,29 +193,29 @@ async def fight_attack(user_id, callback, fight_data):
         
         reward_text = ""
         resource_rewards = []
-        for res_name, res_data in RESOURCES.items():
+        for res_name, res_data in ORES.items():
             if random.random() < 0.7:
                 qty = random.randint(1, 3)
                 resource_rewards.append((res_name, qty))
         
-        async with aiosqlite.connect("w1npaksham.db") as db:
+        async with aiosqlite.connect(DB_PATH) as db:
             for res_name, qty in resource_rewards:
-                await db.execute("INSERT INTO inventory (user_id, item_type, item_id, quantity) VALUES (?, 'resource', ?, ?) ON CONFLICT DO UPDATE SET quantity = quantity + ?", (user_id, res_name, qty, qty))
+                await db.execute("INSERT INTO inventory (user_id, item_type, item_id, quantity) VALUES (?, 'ore', ?, ?) ON CONFLICT DO UPDATE SET quantity = quantity + ?", (user_id, res_name, qty, qty))
             await db.commit()
         
         if resource_rewards:
-            reward_text += "\n📦 **Ресурсы:**\n" + "\n".join([f"{RESOURCES[r]['icon']} {q} {RESOURCES[r]['name']}" for r, q in resource_rewards])
+            reward_text += "\n📦 **Ресурсы:**\n" + "\n".join([f"{ORES[r]['icon']} {q} {ORES[r]['name']}" for r, q in resource_rewards])
         
-        artifact_chance = {"common": 10, "rare": 20, "epic": 30, "legendary": 40, "mythic": 50, "legend": 60, "god": 70, "chaos": 80, "creator": 90, "infinite": 100, "cosmic": 100, "primordial": 100, "eternal": 100}
+        artifact_chance = {"common": 10, "rare": 20, "epic": 30, "legendary": 40, "mythic": 50, "legend": 60, "god": 70}
         chance = artifact_chance.get(boss["tier"], 10)
         
         if random.randint(1, 100) <= chance:
             available_artifacts = [a for a in ARTIFACTS.values() if a["tier"] == boss["tier"] or 
-                                   (boss["tier"] in ["god", "chaos", "creator", "infinite", "cosmic", "primordial", "eternal"] and a["tier"] in ["legend", "god", "chaos", "creator", "infinite", "cosmic", "primordial", "eternal"])]
+                                   (boss["tier"] in ["god", "legend"] and a["tier"] in ["legend", "god"])]
             if available_artifacts:
                 artifact = random.choice(available_artifacts)
                 artifact_id = [aid for aid, a in ARTIFACTS.items() if a["name"] == artifact["name"]][0]
-                async with aiosqlite.connect("w1npaksham.db") as db:
+                async with aiosqlite.connect(DB_PATH) as db:
                     await db.execute("INSERT INTO inventory (user_id, item_type, item_id, quantity) VALUES (?, 'artifact', ?, 1) ON CONFLICT DO UPDATE SET quantity = quantity + 1", (user_id, str(artifact_id)))
                     await db.commit()
                 reward_text += f"\n🎁 **Артефакт:** {artifact['icon']} {artifact['name']}!"
@@ -156,9 +254,8 @@ async def fight_attack(user_id, callback, fight_data):
         )
         return "lose"
     
-    fight_data["player_hp"] = player_hp
-    fight_data["boss_hp"] = boss_hp
-    active_fights[user_id] = fight_data
+    current_fight["player_hp"] = player_hp
+    current_fight["boss_hp"] = boss_hp
     
     from keyboards import get_fight_keyboard
     await callback.message.edit_text(
@@ -169,26 +266,28 @@ async def fight_attack(user_id, callback, fight_data):
         f"⚔️ Атака босса: {boss_attack}\n\n"
         f"{damage_text}\n\n"
         f"Выберите действие:",
-        reply_markup=get_fight_keyboard(fight_data),
+        reply_markup=get_fight_keyboard(current_fight),
         parse_mode="Markdown"
     )
     return "continue"
 
 async def fight_heal(user_id, callback, fight_data):
-    if user_id in active_fights and active_fights[user_id] != fight_data:
-        await callback.answer("⏳ Бой уже идёт!", show_alert=True)
-        return "wait"
+    if user_id not in active_fights:
+        await callback.answer("❌ Бой не найден! Начните новый бой.", show_alert=True)
+        return "error"
     
-    boss_id = fight_data["boss_id"]
-    player_hp = fight_data["player_hp"]
-    boss_hp = fight_data["boss_hp"]
-    player_attack = fight_data["player_attack"]
-    boss_attack = fight_data["boss_attack"]
+    current_fight = active_fights[user_id]
+    
+    boss_id = current_fight["boss_id"]
+    player_hp = current_fight["player_hp"]
+    boss_hp = current_fight["boss_hp"]
+    player_attack = current_fight["player_attack"]
+    boss_attack = current_fight["boss_attack"]
     
     boss = BOSSES.get(boss_id)
     stats = await get_player_stats(user_id)
     
-    async with aiosqlite.connect("w1npaksham.db") as db:
+    async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute("SELECT quantity FROM inventory WHERE user_id = ? AND item_type = 'potion' AND item_id = 'small'", (user_id,)) as cursor:
             result = await cursor.fetchone()
     
@@ -199,12 +298,11 @@ async def fight_heal(user_id, callback, fight_data):
     heal_amount = 20 + random.randint(-5, 10)
     new_hp = min(player_hp + heal_amount, stats["max_hp"])
     
-    async with aiosqlite.connect("w1npaksham.db") as db:
+    async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("UPDATE inventory SET quantity = quantity - 1 WHERE user_id = ? AND item_type = 'potion' AND item_id = 'small'", (user_id,))
         await db.commit()
     
-    fight_data["player_hp"] = new_hp
-    active_fights[user_id] = fight_data
+    current_fight["player_hp"] = new_hp
     
     from keyboards import get_fight_keyboard
     await callback.message.edit_text(
@@ -215,68 +313,19 @@ async def fight_heal(user_id, callback, fight_data):
         f"⚔️ Атака босса: {boss_attack}\n\n"
         f"🧪 Вы использовали зелье! +{heal_amount} HP\n\n"
         f"Выберите действие:",
-        reply_markup=get_fight_keyboard(fight_data),
+        reply_markup=get_fight_keyboard(current_fight),
         parse_mode="Markdown"
     )
     return "healed"
 
-async def go_to_cave(user_id, cave_level, duration_minutes):
-    stats = await get_player_stats(user_id)
-    cave = CAVES.get(cave_level, CAVES[1])
-    
-    if stats["hp"] <= 0:
-        return False, "❌ У вас недостаточно здоровья! Восстановитесь."
-    
-    hp_cost = cave["hp_cost"]
-    if stats["hp"] < hp_cost:
-        return False, f"❌ Недостаточно HP! Нужно {hp_cost} HP, у вас {stats['hp']}"
-    
-    if user_id in active_mining:
-        return False, "⏳ Вы уже добываете ресурсы! Подождите окончания."
-    
-    new_hp = stats["hp"] - hp_cost
-    await update_player_stats(user_id, hp=new_hp)
-    
-    task = asyncio.create_task(mine_in_background(user_id, cave_level, duration_minutes))
-    active_mining[user_id] = task
-    
-    return True, f"⛏️ **{cave['name']}**\n\nВы отправились добывать ресурсы!\n⏱️ Время: {duration_minutes} минут\n❤️ Здоровье: {stats['hp']} → {new_hp}/{stats['max_hp']}\n\n💰 Ресурсы появятся в инвентаре через {duration_minutes} минут!"
-
-async def mine_in_background(user_id, cave_level, duration_minutes):
-    await asyncio.sleep(duration_minutes * 60)
-    
-    cave = CAVES.get(cave_level, CAVES[1])
-    resource_tiers = cave["tiers"]
-    resources_gained = {}
-    
-    for _ in range(random.randint(cave["min_resources"], cave["max_resources"])):
-        tier = random.choice(resource_tiers)
-        available_resources = [r for r, d in RESOURCES.items() if d["tier"] == tier]
-        if available_resources:
-            res = random.choice(available_resources)
-            qty = random.randint(1, 3)
-            resources_gained[res] = resources_gained.get(res, 0) + qty
-    
-    async with aiosqlite.connect("w1npaksham.db") as db:
-        for res, qty in resources_gained.items():
-            await db.execute("INSERT INTO inventory (user_id, item_type, item_id, quantity) VALUES (?, 'resource', ?, ?) ON CONFLICT DO UPDATE SET quantity = quantity + ?", (user_id, res, qty, qty))
-        await db.commit()
-    
-    resource_text = "\n".join([f"{RESOURCES[r]['icon']} {q} {RESOURCES[r]['name']}" for r, q in resources_gained.items()]) if resources_gained else "Ничего не найдено..."
-    
-    from bot import bot
-    await bot.send_message(user_id, f"⛏️ **Добыча ресурсов завершена!**\n\nВы нашли:\n{resource_text}", parse_mode="Markdown")
-    
-    if user_id in active_mining:
-        del active_mining[user_id]
-
+# ==================== МАГАЗИН, ИНВЕНТАРЬ, УЛУЧШЕНИЯ ====================
 async def buy_item(user_id, item_type, item_id, price):
     user = await get_user(user_id)
     if user["rpg_balance"] < price:
         return False, f"❌ Недостаточно {RPG_COIN_NAME}!"
     
     await update_user(user_id, rpg_balance=user["rpg_balance"] - price)
-    async with aiosqlite.connect("w1npaksham.db") as db:
+    async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("INSERT INTO inventory (user_id, item_type, item_id, quantity) VALUES (?, ?, ?, 1) ON CONFLICT DO UPDATE SET quantity = quantity + 1", (user_id, item_type, str(item_id)))
         await db.commit()
     await add_transaction(user_id, "shop", -price, f"Покупка")
@@ -290,7 +339,7 @@ async def equip_item(user_id, item_type, item_id):
         await update_player_stats(user_id, armor_id=int(item_id))
         return True, f"🛡️ Вы экипировали {ARMORS[int(item_id)]['name']}!"
     elif item_type == "artifact":
-        async with aiosqlite.connect("w1npaksham.db") as db:
+        async with aiosqlite.connect(DB_PATH) as db:
             await db.execute("INSERT INTO inventory (user_id, item_type, item_id, quantity) VALUES (?, 'artifact', ?, 1) ON CONFLICT DO UPDATE SET quantity = quantity + 1", (user_id, str(item_id)))
             await db.commit()
         return True, f"✨ Вы экипировали {ARTIFACTS[int(item_id)]['name']}!"
@@ -304,7 +353,7 @@ async def use_potion(user_id, potion_id):
     
     potion = POTIONS[potion_id]
     
-    async with aiosqlite.connect("w1npaksham.db") as db:
+    async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute("SELECT quantity FROM inventory WHERE user_id = ? AND item_type = 'potion' AND item_id = ?", (user_id, potion_id)) as cursor:
             result = await cursor.fetchone()
             if not result or result[0] <= 0:
