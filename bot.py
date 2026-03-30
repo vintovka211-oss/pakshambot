@@ -23,7 +23,7 @@ dp.message.register(clan_name_handler, ClanStates.waiting_name)
 dp.callback_query.register(handle_callback)
 
 async def main():
-    print("🚀 Бот запускается с полной RPG и клановой системой!")
+    print("🚀 Бот запускается с новыми играми (Кубик, Орёл/Решка, Мины 5x5, Башня)!")
     await init_db()
     print("✅ База данных готова")
     await dp.start_polling(bot)
