@@ -18,6 +18,26 @@ SBP_PHONE = "+7 999 888 77 66"
 CRYPTOBOT_API_KEY = "ВАШ_API_КЛЮЧ_ОТ_CRYPTOBOT"
 CRYPTOBOT_SHOP_ID = "ВАШ_ID_МАГАЗИНА"
 
+# ==================== ИГРЫ (КАК В WINPACO) ====================
+SLOTS_SYMBOLS = ["🍒", "🍋", "🍊", "🍉", "⭐", "💎", "7️⃣"]
+SLOTS_MULTIPLIERS = {
+    ("7️⃣", "7️⃣", "7️⃣"): 10,
+    ("💎", "💎", "💎"): 5,
+    ("⭐", "⭐", "⭐"): 3,
+    ("🍒", "🍒", "🍒"): 2,
+    ("🍋", "🍋", "🍋"): 2,
+    ("🍊", "🍊", "🍊"): 2,
+    ("🍉", "🍉", "🍉"): 2,
+}
+
+DICE_MULTIPLIER = 5
+COIN_MULTIPLIER = 1.8
+ROULETTE_MULTIPLIER = 2
+ROULETTE_GREEN_MULTIPLIER = 14
+
+MINES_MULTIPLIERS = [1.15, 1.30, 1.50, 1.80, 2.20, 2.70, 3.30, 4.00, 5.00, 6.50, 8.50, 11.00, 15.00]
+TOWER_MULTIPLIERS = [1.30, 1.80, 2.30, 3.00, 4.00, 5.50, 7.50, 10.00]
+
 # ==================== КЛАНЫ ====================
 CLAN_CREATE_PRICE = 1000
 CLAN_MAX_MEMBERS = 50
