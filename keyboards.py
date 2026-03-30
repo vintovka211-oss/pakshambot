@@ -1,5 +1,5 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from config import BET_BUTTONS, WEAPONS, ARMORS, POTIONS, BOSSES, CAVES, ORES, TOOLS
+from config import *
 
 def get_main_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -19,10 +19,12 @@ def get_main_keyboard():
 
 def get_games_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎲 Кубик (чёт/нечёт)", callback_data="game_dice")],
-        [InlineKeyboardButton(text="🪙 Орёл/Решка", callback_data="game_coin")],
-        [InlineKeyboardButton(text="💣 Мины 5x5", callback_data="game_mines")],
-        [InlineKeyboardButton(text="🗼 Башня", callback_data="game_tower")],
+        [InlineKeyboardButton(text="🎰 Слоты", callback_data="game_slots"),
+         InlineKeyboardButton(text="🎲 Кубик", callback_data="game_dice")],
+        [InlineKeyboardButton(text="🎡 Рулетка", callback_data="game_roulette"),
+         InlineKeyboardButton(text="🪙 Орёл/Решка", callback_data="game_coin")],
+        [InlineKeyboardButton(text="💣 Мины", callback_data="game_mines"),
+         InlineKeyboardButton(text="🗼 Башня", callback_data="game_tower")],
         [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")],
     ])
 
@@ -40,9 +42,23 @@ def get_bet_keyboard(game):
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def get_dice_choice_keyboard(bet):
+    buttons = []
+    row = []
+    for i in range(1, 7):
+        row.append(InlineKeyboardButton(text=str(i), callback_data=f"dice_choice_{i}_{bet}"))
+        if len(row) == 3:
+            buttons.append(row)
+            row = []
+    if row:
+        buttons.append(row)
+    buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="games")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def get_roulette_choice_keyboard(bet):
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎲 ЧЁТ", callback_data=f"dice_choice_even_{bet}"),
-         InlineKeyboardButton(text="🎲 НЕЧЁТ", callback_data=f"dice_choice_odd_{bet}")],
+        [InlineKeyboardButton(text="🔴 Красное", callback_data=f"roulette_choice_🔴_{bet}"),
+         InlineKeyboardButton(text="⚫ Чёрное", callback_data=f"roulette_choice_⚫_{bet}")],
+        [InlineKeyboardButton(text="🟢 Зелёное", callback_data=f"roulette_choice_🟢_{bet}")],
         [InlineKeyboardButton(text="◀️ Назад", callback_data="games")]
     ])
 
@@ -54,38 +70,74 @@ def get_coin_choice_keyboard(bet):
     ])
 
 def get_mines_field_keyboard(game_data):
-    """Клавиатура для поля 5x5 в минах"""
     buttons = []
-    field = game_data["field"]
-    opened = game_data["opened"]
-    
     for i in range(5):
         row = []
         for j in range(5):
             cell = i * 5 + j
-            if cell in opened:
+            if cell in game_data["opened"]:
                 text = "✅"
             else:
-                text = f"⬜"
+                text = "⬜"
             row.append(InlineKeyboardButton(text=text, callback_data=f"mines_cell_{cell}"))
         buttons.append(row)
     
-    buttons.append([InlineKeyboardButton(text="💰 Забрать выигрыш", callback_data=f"mines_cashout_{game_data['bet']}_{game_data['multiplier']}")])
+    step = game_data["step"]
+    multiplier = game_data["multipliers"][step] if step < len(game_data["multipliers"]) else game_data["multipliers"][-1]
+    buttons.append([InlineKeyboardButton(text=f"💰 Забрать выигрыш (x{multiplier:.2f})", callback_data=f"mines_cashout_{game_data['bet']}_{step}_{multiplier}")])
     buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="games")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-def get_tower_level_keyboard(game_data):
-    """Клавиатура для уровня башни"""
+def get_mines_result_keyboard(game_data):
+    buttons = []
+    for i in range(5):
+        row = []
+        for j in range(5):
+            cell = i * 5 + j
+            if cell in game_data["mines"]:
+                text = "💀"
+            elif cell in game_data["opened"]:
+                text = "✅"
+            else:
+                text = "⬜"
+            row.append(InlineKeyboardButton(text=text, callback_data="none"))
+        buttons.append(row)
+    buttons.append([InlineKeyboardButton(text="🔁 Играть снова", callback_data="game_mines")])
+    buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="games")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def get_tower_keyboard(game_data):
     buttons = []
     row = []
     for i in range(5):
         row.append(InlineKeyboardButton(text=f"🟩 {i+1}", callback_data=f"tower_choice_{i}"))
-        if len(row) == 5:
-            buttons.append(row)
-            row = []
-    buttons.append([InlineKeyboardButton(text="💰 Забрать выигрыш", callback_data=f"tower_cashout_{game_data['bet']}_{game_data['multiplier']}")])
+    buttons.append(row)
+    
+    current_level = game_data["current_level"]
+    multiplier = game_data["multipliers"][current_level]
+    buttons.append([InlineKeyboardButton(text=f"💰 Забрать выигрыш (x{multiplier:.2f})", callback_data=f"tower_cashout_{game_data['bet']}_{current_level}_{multiplier}")])
     buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="games")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def get_tower_result_keyboard(game_data):
+    buttons = []
+    for i, level in enumerate(game_data["levels"]):
+        if level["revealed"]:
+            if level["selected"] in level["mines"]:
+                status = "💀 МИНА"
+            else:
+                status = "💎 АЛМАЗ"
+        else:
+            status = "❓ НЕ ОТКРЫТ"
+        buttons.append([InlineKeyboardButton(text=f"Уровень {i+1}: {status}", callback_data="none")])
+    buttons.append([InlineKeyboardButton(text="🔁 Играть снова", callback_data="game_tower")])
+    buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="games")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def get_back_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]
+    ])
 
 def get_rpg_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -109,17 +161,16 @@ def get_boss_keyboard():
     kb.inline_keyboard.append([InlineKeyboardButton(text="◀️ Назад", callback_data="rpg_menu")])
     return kb
 
-def get_fight_keyboard(user_id):
-    from rpg import active_fights
-    fight_data = active_fights.get(user_id)
-    if not fight_data:
-        return get_back_keyboard()
-    
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="⚔️ Атаковать", callback_data="fight_attack")],
-        [InlineKeyboardButton(text="🧪 Использовать зелье", callback_data="fight_heal")],
-        [InlineKeyboardButton(text="🏃 Сбежать", callback_data="rpg_menu")],
-    ])
+def get_shop_keyboard():
+    kb = InlineKeyboardMarkup(inline_keyboard=[])
+    for wid, weapon in WEAPONS.items():
+        kb.inline_keyboard.append([InlineKeyboardButton(text=f"{weapon['icon']} {weapon['name']} - {weapon['price']} 🪙", callback_data=f"buy_weapon_{wid}")])
+    for aid, armor in ARMORS.items():
+        kb.inline_keyboard.append([InlineKeyboardButton(text=f"{armor['icon']} {armor['name']} - {armor['price']} 🪙", callback_data=f"buy_armor_{aid}")])
+    for pid, potion in POTIONS.items():
+        kb.inline_keyboard.append([InlineKeyboardButton(text=f"{potion['icon']} {potion['name']} - {potion['price']} 🪙", callback_data=f"buy_potion_{pid}")])
+    kb.inline_keyboard.append([InlineKeyboardButton(text="◀️ Назад", callback_data="rpg_menu")])
+    return kb
 
 def get_cave_keyboard():
     kb = InlineKeyboardMarkup(inline_keyboard=[])
@@ -135,29 +186,6 @@ def get_cave_duration_keyboard(cave_level):
         [InlineKeyboardButton(text="⏱️ 30 минут", callback_data=f"cave_time_{cave_level}_30")],
         [InlineKeyboardButton(text="⏱️ 60 минут", callback_data=f"cave_time_{cave_level}_60")],
         [InlineKeyboardButton(text="◀️ Назад", callback_data="cave_menu")]
-    ])
-
-def get_shop_keyboard():
-    kb = InlineKeyboardMarkup(inline_keyboard=[])
-    for wid, weapon in WEAPONS.items():
-        kb.inline_keyboard.append([InlineKeyboardButton(text=f"{weapon['icon']} {weapon['name']} - {weapon['price']} 🪙", callback_data=f"buy_weapon_{wid}")])
-    for aid, armor in ARMORS.items():
-        kb.inline_keyboard.append([InlineKeyboardButton(text=f"{armor['icon']} {armor['name']} - {armor['price']} 🪙", callback_data=f"buy_armor_{aid}")])
-    for pid, potion in POTIONS.items():
-        kb.inline_keyboard.append([InlineKeyboardButton(text=f"{potion['icon']} {potion['name']} - {potion['price']} 🪙", callback_data=f"buy_potion_{pid}")])
-    kb.inline_keyboard.append([InlineKeyboardButton(text="◀️ Назад", callback_data="rpg_menu")])
-    return kb
-
-def get_payment_keyboard():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💳 СБП (по номеру телефона)", callback_data="pay_sbp")],
-        [InlineKeyboardButton(text="🪙 CryptoBot (криптовалюта)", callback_data="pay_crypto")],
-        [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]
-    ])
-
-def get_back_keyboard():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu")]
     ])
 
 def get_admin_keyboard():
