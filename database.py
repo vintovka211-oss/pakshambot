@@ -21,7 +21,8 @@ async def init_db():
                 consecutive_wins INTEGER DEFAULT 0,
                 mine_level INTEGER DEFAULT 1,
                 mine_last_collect TIMESTAMP,
-                mine_accumulated INTEGER DEFAULT 0
+                mine_accumulated INTEGER DEFAULT 0,
+                clan_id INTEGER
             )
         ''')
         await db.execute('''
@@ -58,6 +59,28 @@ async def init_db():
                 amount INTEGER,
                 description TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS clans (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE,
+                leader_id INTEGER,
+                level INTEGER DEFAULT 1,
+                exp INTEGER DEFAULT 0,
+                balance INTEGER DEFAULT 0,
+                members TEXT DEFAULT '[]',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS clan_boss_fights (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                clan_id INTEGER,
+                boss_id INTEGER,
+                current_hp INTEGER,
+                started_at TIMESTAMP,
+                last_hit TIMESTAMP
             )
         ''')
         await db.commit()
