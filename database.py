@@ -83,6 +83,14 @@ async def init_db():
                 last_hit TIMESTAMP
             )
         ''')
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS active_games (
+                user_id INTEGER PRIMARY KEY,
+                game_type TEXT,
+                game_data TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
         await db.commit()
         print("✅ База данных инициализирована")
 
