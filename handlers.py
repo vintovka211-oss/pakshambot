@@ -743,7 +743,7 @@ async def handle_callback(callback: types.CallbackQuery, state: FSMContext):
         quantity = int(parts[3])
         await sell_ore(user_id, ore_id, quantity, callback.message)
     
-    # БОССЫ
+        # БОССЫ
     elif data == "fight_boss":
         await callback.message.edit_text("⚔️ **Выберите босса:**", reply_markup=get_boss_keyboard(), parse_mode="Markdown")
     
