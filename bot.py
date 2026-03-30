@@ -19,10 +19,11 @@ dp.message.register(welcome_new_member, lambda m: m.new_chat_members)
 dp.message.register(admin_process_user_id, AdminStates.waiting_user_id)
 dp.message.register(admin_process_amount, AdminStates.waiting_amount)
 dp.message.register(admin_process_premium, AdminStates.waiting_days)
+dp.message.register(clan_name_handler, ClanStates.waiting_name)
 dp.callback_query.register(handle_callback)
 
 async def main():
-    print("🚀 Бот запускается с полной RPG системой!")
+    print("🚀 Бот запускается с полной RPG и клановой системой!")
     await init_db()
     print("✅ База данных готова")
     await dp.start_polling(bot)
