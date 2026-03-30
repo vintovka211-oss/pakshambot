@@ -13,7 +13,7 @@ BET_BUTTONS = [1, 5, 10, 25, 50, 100, 250, 500]
 
 SBP_PHONE = "+7 999 888 77 66"
 
-# ==================== НАСТРОЙКИ КЛАНОВ ====================
+# ==================== КЛАНЫ ====================
 CLAN_CREATE_PRICE = 1000
 CLAN_MAX_MEMBERS = 50
 CLAN_LEVELS = {
@@ -66,16 +66,16 @@ ORES = {
 
 # ==================== ПЕЩЕРЫ ====================
 CAVES = {
-    1: {"name": "🪨 Каменная пещера", "min_resources": 1, "max_resources": 3, "tiers": ["common"], "time_multiplier": 1, "required_tool": 1},
-    2: {"name": "🪵 Лесная чаща", "min_resources": 2, "max_resources": 4, "tiers": ["common", "rare"], "time_multiplier": 1.2, "required_tool": 2},
-    3: {"name": "🔥 Вулканическая пещера", "min_resources": 3, "max_resources": 6, "tiers": ["common", "rare", "epic"], "time_multiplier": 1.5, "required_tool": 3},
-    4: {"name": "❄️ Ледяной грот", "min_resources": 5, "max_resources": 10, "tiers": ["rare", "epic", "legendary"], "time_multiplier": 2, "required_tool": 4},
-    5: {"name": "🌌 Космическая бездна", "min_resources": 10, "max_resources": 20, "tiers": ["epic", "legendary", "mythic"], "time_multiplier": 3, "required_tool": 5},
-    6: {"name": "🕰️ Храм времени", "min_resources": 20, "max_resources": 40, "tiers": ["legendary", "mythic", "cosmic"], "time_multiplier": 5, "required_tool": 6},
-    7: {"name": "👁️ Сердце вселенной", "min_resources": 50, "max_resources": 100, "tiers": ["mythic", "cosmic", "primordial", "eternal"], "time_multiplier": 10, "required_tool": 7},
+    1: {"name": "🪨 Каменная пещера", "min_resources": 1, "max_resources": 3, "tiers": ["common"], "required_tool": 1},
+    2: {"name": "🪵 Лесная чаща", "min_resources": 2, "max_resources": 4, "tiers": ["common", "rare"], "required_tool": 2},
+    3: {"name": "🔥 Вулканическая пещера", "min_resources": 3, "max_resources": 6, "tiers": ["common", "rare", "epic"], "required_tool": 3},
+    4: {"name": "❄️ Ледяной грот", "min_resources": 5, "max_resources": 10, "tiers": ["rare", "epic", "legendary"], "required_tool": 4},
+    5: {"name": "🌌 Космическая бездна", "min_resources": 10, "max_resources": 20, "tiers": ["epic", "legendary", "mythic"], "required_tool": 5},
+    6: {"name": "🕰️ Храм времени", "min_resources": 20, "max_resources": 40, "tiers": ["legendary", "mythic", "cosmic"], "required_tool": 6},
+    7: {"name": "👁️ Сердце вселенной", "min_resources": 50, "max_resources": 100, "tiers": ["mythic", "cosmic", "primordial", "eternal"], "required_tool": 7},
 }
 
-# ==================== БОССЫ (30 УРОВНЕЙ) ====================
+# ==================== БОССЫ ====================
 BOSSES = {
     1: {"name": "🐀 Крысиный король", "hp": 50, "attack": 5, "rpg_reward": 5, "exp": 10, "icon": "🐀", "tier": "common", "min_level": 1},
     2: {"name": "🐺 Лесной волк", "hp": 100, "attack": 10, "rpg_reward": 10, "exp": 20, "icon": "🐺", "tier": "common", "min_level": 2},
@@ -99,7 +99,7 @@ BOSSES = {
     20: {"name": "👑 Верховный бог", "hp": 100000, "attack": 1500, "rpg_reward": 10000, "exp": 20000, "icon": "👑", "tier": "god", "min_level": 80},
 }
 
-# ==================== ОРУЖИЕ (20 УРОВНЕЙ) ====================
+# ==================== ОРУЖИЕ ====================
 WEAPONS = {
     1: {"name": "🗡️ Ржавый меч", "attack": 5, "price": 10, "icon": "🗡️", "tier": "common"},
     2: {"name": "⚔️ Стальной меч", "attack": 10, "price": 30, "icon": "⚔️", "tier": "common"},
@@ -118,7 +118,7 @@ WEAPONS = {
     15: {"name": "👑 Божественный меч", "attack": 2000, "price": 200000, "icon": "👑", "tier": "god"},
 }
 
-# ==================== БРОНЯ (15 УРОВНЕЙ) ====================
+# ==================== БРОНЯ ====================
 ARMORS = {
     1: {"name": "🥾 Кожаная броня", "defense": 5, "price": 10, "icon": "🥾", "tier": "common"},
     2: {"name": "🛡️ Кольчуга", "defense": 10, "price": 30, "icon": "🛡️", "tier": "common"},
@@ -165,7 +165,6 @@ POTIONS = {
 EVENTS = {
     "double_rpg": {"name": "🎉 Двойные RPG монеты!", "multiplier": 2, "duration": 24, "icon": "🎉"},
     "double_exp": {"name": "⭐ Двойной опыт!", "multiplier": 2, "duration": 24, "icon": "⭐"},
-    "half_hp_cost": {"name": "❤️ Половина стоимости HP в пещерах!", "multiplier": 0.5, "duration": 24, "icon": "❤️"},
     "discount_shop": {"name": "🛒 Скидка 30% в магазине!", "multiplier": 0.7, "duration": 24, "icon": "🛒"},
     "legendary_boss": {"name": "👑 Легендарные боссы появляются чаще!", "multiplier": 2, "duration": 24, "icon": "👑"},
 }
