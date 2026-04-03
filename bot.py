@@ -10,6 +10,9 @@ TOKEN = os.environ.get("TOKEN")
 if not TOKEN:
     raise ValueError("Переменная TOKEN не установлена!")
 
+# ВАШ TELEGRAM ID (только вы можете активировать подписку)
+ADMIN_ID = 8493522297
+
 # НОМЕР ТЕЛЕФОНА ДЛЯ ОПЛАТЫ (ЗАМЕНИТЕ НА СВОЙ)
 PHONE_NUMBER = "+79276685512"  # 👈 ВСТАВЬТЕ СВОЙ НОМЕР
 
@@ -104,26 +107,43 @@ async def subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🔐 *Как оплатить:*\n"
         f"1️⃣ Переведите 199 ₽ по номеру телефона:\n"
         f"`{PHONE_NUMBER}`\n\n"
-        f"2️⃣ Напишите команду /confirm\n\n"
-        f"3️⃣ Отправьте скриншот чека (можно сюда же)\n\n"
-        f"✅ После проверки подписка активируется на 30 дней\n\n"
-        f"⏱ Обычно в течение часа в рабочее время",
+        f"2️⃣ После оплаты пришлите скриншот чека сюда\n"
+        f"3️⃣ Я активирую подписку вручную\n\n"
+        f"✅ Подписка будет активна 30 дней\n\n"
+        f"⏱ Обычно активирую в течение часа в рабочее время",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
 
-# ===== ПОДТВЕРЖДЕНИЕ ОПЛАТЫ (АКТИВАЦИЯ ПОДПИСКИ) =====
+# ===== АКТИВАЦИЯ ПОДПИСКИ (ТОЛЬКО ДЛЯ АДМИНА) =====
 async def confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    until = (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
-    cursor.execute('UPDATE users SET subscription_until = ? WHERE user_id = ?', (until, user_id))
-    conn.commit()
-    await update.message.reply_text(
-        "✅ *Подписка активирована на 30 дней!*\n\n"
-        "Теперь вы можете пользоваться всеми функциями бота.\n"
-        "Спасибо за поддержку! 🙌",
-        parse_mode="Markdown"
-    )
+    
+    # Проверка: только админ может активировать подписку
+    if user_id != ADMIN_ID:
+        await update.message.reply_text("❌ У вас нет прав для этой команды.\n\nЕсли вы оплатили подписку, отправьте чек сюда — я активирую вручную.")
+        return
+    
+    # Получаем ID пользователя из команды /confirm 123456789
+    args = context.args
+    if not args:
+        await update.message.reply_text(
+            "ℹ️ *Как активировать подписку:*\n\n"
+            "1. Узнайте ID пользователя (он виден в переписке или через @userinfobot)\n"
+            "2. Напишите: `/confirm 123456789`\n\n"
+            "Где 123456789 — ID пользователя",
+            parse_mode="Markdown"
+        )
+        return
+    
+    try:
+        target_user_id = int(args[0])
+        until = (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
+        cursor.execute('UPDATE users SET subscription_until = ? WHERE user_id = ?', (until, target_user_id))
+        conn.commit()
+        await update.message.reply_text(f"✅ Подписка активирована для пользователя `{target_user_id}` на 30 дней!", parse_mode="Markdown")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка: {e}\nУбедитесь, что ID правильный.")
 
 # ===== КНОПКА НАЗАД =====
 async def back_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
