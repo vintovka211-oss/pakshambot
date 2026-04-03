@@ -5,13 +5,15 @@ from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
-# Токен из переменной окружения (безопасно)
+# ===== НАСТРОЙКИ =====
 TOKEN = os.environ.get("TOKEN")
-
 if not TOKEN:
     raise ValueError("Переменная TOKEN не установлена!")
 
-# База данных
+# НОМЕР ТЕЛЕФОНА ДЛЯ ОПЛАТЫ (ЗАМЕНИТЕ НА СВОЙ)
+PHONE_NUMBER = "+79276685512"  # 👈 ВСТАВЬТЕ СВОЙ НОМЕР
+
+# ===== БАЗА ДАННЫХ =====
 conn = sqlite3.connect('users.db', check_same_thread=False)
 cursor = conn.cursor()
 cursor.execute('''
@@ -24,10 +26,10 @@ cursor.execute('''
 ''')
 conn.commit()
 
-# Логирование
+# ===== ЛОГИРОВАНИЕ =====
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# Команда /start
+# ===== КОМАНДА /start =====
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     username = update.effective_user.username or "NoUsername"
@@ -50,14 +52,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
-# Добавление дохода
+# ===== ДОБАВЛЕНИЕ ДОХОДА =====
 async def add_income_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     await query.edit_message_text("Введите сумму дохода цифрами (например: 15000):")
     context.user_data['waiting_for_income'] = True
 
-# Обработка введённой суммы
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get('waiting_for_income'):
         try:
@@ -70,7 +71,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             await update.message.reply_text("❌ Ошибка. Введите число без букв.")
 
-# Показать налог
+# ===== МОЙ НАЛОГ =====
 async def my_tax(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -78,33 +79,71 @@ async def my_tax(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cursor.execute('SELECT income FROM users WHERE user_id = ?', (user_id,))
     income = cursor.fetchone()[0] or 0
     tax = int(income * 0.06)
-    await query.edit_message_text(f"📊 Доход за месяц: {income} ₽\n💰 Налог 6%: {tax} ₽\n\n🗓 Заплатить до 25 числа.")
-
-# Подписка
-async def subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
     await query.edit_message_text(
-        "💎 *Подписка 199 ₽/мес*\n\n"
-        "Что даёт:\n"
-        "✅ Автоматический расчёт налога\n"
-        "✅ Напоминалки об оплате\n"
-        "✅ История доходов\n\n"
-        "🔗 *Как оплатить:*\n"
-        "Переведите 199 ₽ на карту *1234 5678 9012 3456* и напишите /confirm\n\n"
-        "После подтверждения подписка активируется на 30 дней.",
+        f"📊 *Доход за месяц:* {income} ₽\n"
+        f"💰 *Налог 6%:* {tax} ₽\n\n"
+        f"🗓 Заплатить до 25 числа.",
         parse_mode="Markdown"
     )
 
-# Подтверждение оплаты
+# ===== ПОДПИСКА (ОПЛАТА ПО СБП) =====
+async def subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    keyboard = [
+        [InlineKeyboardButton("🔙 Назад", callback_data="back_to_menu")]
+    ]
+    
+    await query.edit_message_text(
+        f"💎 *Подписка 199 ₽/мес*\n\n"
+        f"Что даёт:\n"
+        f"✅ Автоматический расчёт налога за месяц\n"
+        f"✅ Напоминалки об оплате до 25 числа\n"
+        f"✅ История всех доходов\n\n"
+        f"🔐 *Как оплатить:*\n"
+        f"1️⃣ Переведите 199 ₽ по номеру телефона:\n"
+        f"`{PHONE_NUMBER}`\n\n"
+        f"2️⃣ Напишите команду /confirm\n\n"
+        f"3️⃣ Отправьте скриншот чека (можно сюда же)\n\n"
+        f"✅ После проверки подписка активируется на 30 дней\n\n"
+        f"⏱ Обычно в течение часа в рабочее время",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown"
+    )
+
+# ===== ПОДТВЕРЖДЕНИЕ ОПЛАТЫ (АКТИВАЦИЯ ПОДПИСКИ) =====
 async def confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     until = (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
     cursor.execute('UPDATE users SET subscription_until = ? WHERE user_id = ?', (until, user_id))
     conn.commit()
-    await update.message.reply_text("✅ Подписка активирована на 30 дней!")
+    await update.message.reply_text(
+        "✅ *Подписка активирована на 30 дней!*\n\n"
+        "Теперь вы можете пользоваться всеми функциями бота.\n"
+        "Спасибо за поддержку! 🙌",
+        parse_mode="Markdown"
+    )
 
-# Запуск
+# ===== КНОПКА НАЗАД =====
+async def back_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    keyboard = [
+        [InlineKeyboardButton("➕ Добавить доход", callback_data="add_income")],
+        [InlineKeyboardButton("📊 Мой налог за месяц", callback_data="my_tax")],
+        [InlineKeyboardButton("💎 Подписка 199 ₽/мес", callback_data="subscription")]
+    ]
+    
+    await query.edit_message_text(
+        "🤖 *Налоговый помощник для самозанятых*\n\n"
+        "Выберите действие:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown"
+    )
+
+# ===== ЗАПУСК БОТА =====
 def main():
     app = Application.builder().token(TOKEN).build()
     
@@ -113,9 +152,10 @@ def main():
     app.add_handler(CallbackQueryHandler(add_income_callback, pattern="add_income"))
     app.add_handler(CallbackQueryHandler(my_tax, pattern="my_tax"))
     app.add_handler(CallbackQueryHandler(subscription, pattern="subscription"))
+    app.add_handler(CallbackQueryHandler(back_to_menu, pattern="back_to_menu"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     
-    print("Бот запущен...")
+    print("✅ Бот запущен и работает...")
     app.run_polling()
 
 if __name__ == "__main__":
