@@ -5,7 +5,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # ========== ВСТАВЬТЕ НОВЫЙ ТОКЕН ==========
-TOKEN = "НОВЫЙ_ТОКЕН_ОТ_BOTFATHER"
+TOKEN = "8590452175:AAGcmk1Gn-GnVZbUUAvLTRhd3QBslVE5bFk"
 # ==========================================
 
 SERVER_IP = "hi3.qwertyx.host:27228"
@@ -19,11 +19,12 @@ async def get_status():
         return cache["data"]
     try:
         server = JavaServer.lookup(SERVER_IP)
-        status = server.status()
+        status = await server.async_status()
         
         players_list = []
         if status.players.sample:
-            players_list = [p.name for p in status.players.sample]
+            for p in status.players.sample:
+                players_list.append(p.name)
         
         data = {
             "online": True,
@@ -37,33 +38,32 @@ async def get_status():
         cache["data"] = data
         cache["time"] = now
         return data
-    except:
+    except Exception as e:
+        print(f"Ошибка: {e}")
         return {"online": False, "list": [], "names_hidden": False}
 
 def get_main_keyboard():
-    return InlineKeyboardMarkup([
+    keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🟢 Статус", callback_data="status"),
          InlineKeyboardButton("📊 Онлайн", callback_data="online")],
         [InlineKeyboardButton("👥 Список игроков", callback_data="list"),
          InlineKeyboardButton("🖥️ IP", callback_data="ip")],
         [InlineKeyboardButton("🔄 Обновить", callback_data="refresh")]
     ])
+    return keyboard
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     chats.add(chat_id)
     await update.message.reply_text(
-        "🎮 **Бот сервера Minecraft**\n\n"
-        "👇 Нажмите на кнопку:",
-        parse_mode="Markdown",
+        "🎮 Бот сервера Minecraft\n\n👇 Нажмите на кнопку:",
         reply_markup=get_main_keyboard()
     )
 
 async def cmd_ip(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(f"🖥️ `{SERVER_IP}`", parse_mode="Markdown")
+    await update.message.reply_text(f"🖥️ {SERVER_IP}")
 
 async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показывает список всех игроков в сети"""
     data = await get_status()
     
     if not data["online"]:
@@ -79,10 +79,7 @@ async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     players_list = "\n".join([f"👤 {p}" for p in data["list"]])
-    await update.message.reply_text(
-        f"👥 **Игроки в сети ({data['players']}/{data['max']}):**\n\n{players_list}",
-        parse_mode="Markdown"
-    )
+    await update.message.reply_text(f"👥 Игроки в сети ({data['players']}/{data['max']}):\n\n{players_list}")
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -96,19 +93,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text = "🔴 Сервер выключен"
         else:
             hidden_note = "\n⚠️ Имена игроков скрыты хостингом" if data.get("names_hidden", False) else ""
-            text = (f"🟢 **Сервер работает**\n"
+            text = (f"🟢 Сервер работает\n"
                    f"━━━━━━━━━━━━━━━━━━━\n"
                    f"📊 Онлайн: {data['players']}/{data['max']}\n"
                    f"🎮 Версия: {data['version']}\n"
                    f"📝 {data['motd']}{hidden_note}")
-        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=get_main_keyboard())
+        await query.edit_message_text(text, reply_markup=get_main_keyboard())
     
     elif action == "online":
         if data["online"]:
-            text = f"📊 **Сейчас на сервере:** {data['players']} / {data['max']} игроков"
+            text = f"📊 Сейчас на сервере: {data['players']} / {data['max']} игроков"
         else:
             text = "🔴 Сервер выключен"
-        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=get_main_keyboard())
+        await query.edit_message_text(text, reply_markup=get_main_keyboard())
     
     elif action == "list":
         if not data["online"]:
@@ -119,66 +116,57 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text = "🌙 На сервере никого нет"
         else:
             players_list = "\n".join([f"👤 {p}" for p in data["list"]])
-            text = f"👥 **Игроки в сети ({data['players']}/{data['max']}):**\n\n{players_list}"
-        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=get_main_keyboard())
+            text = f"👥 Игроки в сети ({data['players']}/{data['max']}):\n\n{players_list}"
+        await query.edit_message_text(text, reply_markup=get_main_keyboard())
     
     elif action == "ip":
-        await query.edit_message_text(
-            f"🖥️ `{SERVER_IP}`",
-            parse_mode="Markdown",
-            reply_markup=get_main_keyboard()
-        )
+        await query.edit_message_text(f"🖥️ {SERVER_IP}", reply_markup=get_main_keyboard())
     
     elif action == "refresh":
         cache["data"] = None
-        await query.edit_message_text("🔄 **Обновление...**", parse_mode="Markdown")
+        await query.edit_message_text("🔄 Обновление...", reply_markup=get_main_keyboard())
         new_data = await get_status()
         if new_data["online"]:
             hidden_note = "\n⚠️ Имена игроков скрыты хостингом" if new_data.get("names_hidden", False) else ""
-            text = (f"🟢 **Сервер работает**\n"
+            text = (f"🟢 Сервер работает\n"
                    f"━━━━━━━━━━━━━━━━━━━\n"
                    f"📊 Онлайн: {new_data['players']}/{new_data['max']}\n"
                    f"🎮 Версия: {new_data['version']}\n"
                    f"📝 {new_data['motd']}{hidden_note}")
         else:
             text = "🔴 Сервер выключен"
-        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=get_main_keyboard())
-
-async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отладочная команда /debug"""
-    data = await get_status()
-    if data["online"]:
-        await update.message.reply_text(
-            f"📡 **Данные от сервера:**\n\n"
-            f"Онлайн: {data['players']}/{data['max']}\n"
-            f"Список: {data['list'] if data['list'] else 'ПУСТО'}\n"
-            f"Имена скрыты: {data.get('names_hidden', False)}\n"
-            f"Версия: {data['version']}\n"
-            f"MOTD: {data['motd']}",
-            parse_mode="Markdown"
-        )
-    else:
-        await update.message.reply_text("🔴 Сервер выключен")
+        await query.edit_message_text(text, reply_markup=get_main_keyboard())
 
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Команда /status — статус сервера"""
     data = await get_status()
     if not data["online"]:
         await update.message.reply_text("🔴 Сервер выключен")
     else:
         hidden_note = "\n⚠️ Имена игроков скрыты хостингом" if data.get("names_hidden", False) else ""
-        text = (f"🟢 **Сервер работает**\n"
+        text = (f"🟢 Сервер работает\n"
                f"━━━━━━━━━━━━━━━━━━━\n"
                f"📊 Онлайн: {data['players']}/{data['max']}\n"
                f"🎮 Версия: {data['version']}\n"
                f"📝 {data['motd']}{hidden_note}")
-        await update.message.reply_text(text, parse_mode="Markdown")
+        await update.message.reply_text(text)
 
 async def cmd_online(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Команда /online — только онлайн"""
     data = await get_status()
     if data["online"]:
-        await update.message.reply_text(f"📊 **Сейчас на сервере:** {data['players']} / {data['max']} игроков", parse_mode="Markdown")
+        await update.message.reply_text(f"📊 Сейчас на сервере: {data['players']} / {data['max']} игроков")
+    else:
+        await update.message.reply_text("🔴 Сервер выключен")
+
+async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = await get_status()
+    if data["online"]:
+        await update.message.reply_text(
+            f"📡 Данные от сервера:\n\n"
+            f"Онлайн: {data['players']}/{data['max']}\n"
+            f"Список: {data['list'] if data['list'] else 'ПУСТО'}\n"
+            f"Имена скрыты: {data.get('names_hidden', False)}\n"
+            f"Версия: {data['version']}"
+        )
     else:
         await update.message.reply_text("🔴 Сервер выключен")
 
@@ -195,7 +183,6 @@ def main():
     
     print("✅ Бот запущен!")
     print(f"📡 Сервер: {SERVER_IP}")
-    print("📋 Команды: /start, /ip, /list, /status, /online, /debug")
     
     app.run_polling()
 
