@@ -38,8 +38,7 @@ async def get_status():
         cache["data"] = data
         cache["time"] = now
         return data
-    except Exception as e:
-        print(f"Ошибка: {e}")
+    except:
         return {"online": False, "list": [], "names_hidden": False}
 
 def get_main_keyboard():
@@ -48,7 +47,8 @@ def get_main_keyboard():
          InlineKeyboardButton("📊 Онлайн", callback_data="online")],
         [InlineKeyboardButton("👥 Список игроков", callback_data="list"),
          InlineKeyboardButton("🖥️ IP", callback_data="ip")],
-        [InlineKeyboardButton("🔄 Обновить", callback_data="refresh")]
+        [InlineKeyboardButton("📜 Правила", callback_data="rules"),
+         InlineKeyboardButton("🔄 Обновить", callback_data="refresh")]
     ])
     return keyboard
 
@@ -56,30 +56,58 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     chats.add(chat_id)
     await update.message.reply_text(
-        "🎮 Бот сервера Minecraft\n\n👇 Нажмите на кнопку:",
+        "🎮 **HazeSMP**\n\n👇 Нажми на кнопку:",
         reply_markup=get_main_keyboard()
     )
 
 async def cmd_ip(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(f"🖥️ {SERVER_IP}")
+    await update.message.reply_text(f"🖥️ `{SERVER_IP}`")
 
 async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = await get_status()
-    
     if not data["online"]:
         await update.message.reply_text("🔴 Сервер выключен")
         return
-    
     if data["names_hidden"]:
-        await update.message.reply_text(f"⚠️ Хостинг скрывает имена игроков\n📊 Онлайн: {data['players']} / {data['max']}")
+        await update.message.reply_text(f"⚠️ Имена скрыты хостингом\n📊 Онлайн: {data['players']}/{data['max']}")
         return
-    
     if data["players"] == 0:
         await update.message.reply_text("🌙 На сервере никого нет")
         return
-    
     players_list = "\n".join([f"👤 {p}" for p in data["list"]])
-    await update.message.reply_text(f"👥 Игроки в сети ({data['players']}/{data['max']}):\n\n{players_list}")
+    await update.message.reply_text(f"👥 Игроки ({data['players']}/{data['max']}):\n\n{players_list}")
+
+async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    rules_text = """📜 **ПРАВИЛА СЕРВЕРА HazeSMP**
+
+⚠️ **ВАЖНО: ЧИТЫ = БАН НАВСЕГДА**
+Любой вид читов, X-Ray, автокликеры, KillAura, Fly, Speed и т.д.
+→ БАН НАВСЕГДА без права обжалования
+
+🌿 **Этика и чистота карты**
+1. Не разбрасывайте блоки где попало
+2. Не стройте бессмысленные постройки вне базы
+3. Запрещены оскорбительные постройки
+
+⚔️ **Гриф и PvP**
+1. При грифе запрещено уничтожать базу полностью
+2. Запрещён гриф ночью или без владельца базы
+3. Нельзя убивать новичков, если они не напали первыми
+4. Убийство должно быть обосновано
+
+🏰 **Страны и войны**
+1. Глава обязан обозначить границы территории
+2. Запрещено забирать деревни и данжи
+3. О войне предупредить за 12 часов
+4. Мировая война: разрешено всё
+
+🛡️ **Правила для администрации**
+1. Неадекватное поведение → снятие
+2. Запрещено использовать админку в личных целях
+
+💬 Соблюдайте правила и уважайте других!"""
+    
+    await update.message.reply_text(rules_text, parse_mode="Markdown")
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -92,7 +120,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not data["online"]:
             text = "🔴 Сервер выключен"
         else:
-            hidden_note = "\n⚠️ Имена игроков скрыты хостингом" if data.get("names_hidden", False) else ""
+            hidden_note = "\n⚠️ Имена скрыты" if data.get("names_hidden", False) else ""
             text = (f"🟢 Сервер работает\n"
                    f"━━━━━━━━━━━━━━━━━━━\n"
                    f"📊 Онлайн: {data['players']}/{data['max']}\n"
@@ -111,23 +139,48 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not data["online"]:
             text = "🔴 Сервер выключен"
         elif data["names_hidden"]:
-            text = f"⚠️ Хостинг скрывает имена игроков\n📊 Онлайн: {data['players']} / {data['max']}"
+            text = f"⚠️ Имена скрыты\n📊 Онлайн: {data['players']}/{data['max']}"
         elif data["players"] == 0:
             text = "🌙 На сервере никого нет"
         else:
             players_list = "\n".join([f"👤 {p}" for p in data["list"]])
-            text = f"👥 Игроки в сети ({data['players']}/{data['max']}):\n\n{players_list}"
+            text = f"👥 Игроки ({data['players']}/{data['max']}):\n\n{players_list}"
         await query.edit_message_text(text, reply_markup=get_main_keyboard())
     
     elif action == "ip":
         await query.edit_message_text(f"🖥️ {SERVER_IP}", reply_markup=get_main_keyboard())
+    
+    elif action == "rules":
+        rules_text = """📜 **ПРАВИЛА СЕРВЕРА HazeSMP**
+
+⚠️ **ЧИТЫ = БАН НАВСЕГДА**
+
+🌿 **Этика**
+1. Не разбрасывайте блоки
+2. Не стройте бессмысленные постройки
+3. Запрещены оскорбительные постройки
+
+⚔️ **Гриф и PvP**
+1. Гриф 50% базы
+2. Нельзя убивать новичков
+3. Убийство должно быть обосновано
+
+🏰 **Страны и войны**
+1. О войне за 12 часов
+2. Мировая война: всё можно
+
+🛡️ **Администрация**
+1. Не использовать админку в личных целях
+
+💬 Уважайте других игроков!"""
+        await query.edit_message_text(rules_text, parse_mode="Markdown", reply_markup=get_main_keyboard())
     
     elif action == "refresh":
         cache["data"] = None
         await query.edit_message_text("🔄 Обновление...", reply_markup=get_main_keyboard())
         new_data = await get_status()
         if new_data["online"]:
-            hidden_note = "\n⚠️ Имена игроков скрыты хостингом" if new_data.get("names_hidden", False) else ""
+            hidden_note = "\n⚠️ Имена скрыты" if new_data.get("names_hidden", False) else ""
             text = (f"🟢 Сервер работает\n"
                    f"━━━━━━━━━━━━━━━━━━━\n"
                    f"📊 Онлайн: {new_data['players']}/{new_data['max']}\n"
@@ -142,7 +195,7 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not data["online"]:
         await update.message.reply_text("🔴 Сервер выключен")
     else:
-        hidden_note = "\n⚠️ Имена игроков скрыты хостингом" if data.get("names_hidden", False) else ""
+        hidden_note = "\n⚠️ Имена скрыты" if data.get("names_hidden", False) else ""
         text = (f"🟢 Сервер работает\n"
                f"━━━━━━━━━━━━━━━━━━━\n"
                f"📊 Онлайн: {data['players']}/{data['max']}\n"
@@ -157,28 +210,15 @@ async def cmd_online(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("🔴 Сервер выключен")
 
-async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = await get_status()
-    if data["online"]:
-        await update.message.reply_text(
-            f"📡 Данные от сервера:\n\n"
-            f"Онлайн: {data['players']}/{data['max']}\n"
-            f"Список: {data['list'] if data['list'] else 'ПУСТО'}\n"
-            f"Имена скрыты: {data.get('names_hidden', False)}\n"
-            f"Версия: {data['version']}"
-        )
-    else:
-        await update.message.reply_text("🔴 Сервер выключен")
-
 def main():
     app = Application.builder().token(TOKEN).build()
     
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("ip", cmd_ip))
     app.add_handler(CommandHandler("list", cmd_list))
+    app.add_handler(CommandHandler("rules", cmd_rules))
     app.add_handler(CommandHandler("status", cmd_status))
     app.add_handler(CommandHandler("online", cmd_online))
-    app.add_handler(CommandHandler("debug", cmd_debug))
     app.add_handler(CallbackQueryHandler(button_handler))
     
     print("✅ Бот запущен!")
