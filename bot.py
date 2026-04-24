@@ -13,7 +13,6 @@ SERVER_IP = "hi3.qwertyx.host:27228"
 cache = {"data": None, "time": 0}
 last_players = set()
 chats = set()
-is_tracking = False  # Защита от двойного запуска трекера
 
 async def get_status():
     now = time.time()
@@ -37,40 +36,39 @@ async def get_status():
         return {"online": False, "list": []}
 
 async def tracker(app):
-    global last_players, is_tracking
-    
-    # Защита от двойного запуска
-    if is_tracking:
-        return
-    is_tracking = True
+    global last_players
     
     while True:
         try:
             data = await get_status()
+            
             if data["online"]:
                 current = set(data["list"])
                 
-                # Новые игроки
-                for p in (current - last_players):
-                    for c in list(chats):
+                # Кто зашёл
+                for player in current - last_players:
+                    for chat_id in list(chats):
                         try:
-                            await app.bot.send_message(c, f"🟢 **{p}** зашёл на сервер", parse_mode="Markdown")
+                            await app.bot.send_message(chat_id, f"🟢 {player} зашёл на сервер")
                         except:
-                            chats.discard(c)
+                            chats.discard(chat_id)
+                    await asyncio.sleep(0.5)  # Маленькая задержка между отправками
                 
-                # Игроки, которые вышли
-                for p in (last_players - current):
-                    for c in list(chats):
+                # Кто вышел
+                for player in last_players - current:
+                    for chat_id in list(chats):
                         try:
-                            await app.bot.send_message(c, f"🔴 **{p}** вышел с сервера", parse_mode="Markdown")
+                            await app.bot.send_message(chat_id, f"🔴 {player} вышел с сервера")
                         except:
-                            chats.discard(c)
+                            chats.discard(chat_id)
+                    await asyncio.sleep(0.5)
                 
                 last_players = current
             
             await asyncio.sleep(5)
+            
         except Exception as e:
-            print(f"Ошибка в трекере: {e}")
+            print(f"Ошибка: {e}")
             await asyncio.sleep(5)
 
 def get_main_keyboard():
@@ -148,14 +146,13 @@ def main():
     app.add_handler(CommandHandler("ip", cmd_ip))
     app.add_handler(CallbackQueryHandler(button_handler))
     
-    # Запускаем трекер правильно
+    # Запускаем трекер
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.create_task(tracker(app))
     
     print("✅ Бот запущен!")
     print(f"📡 Сервер: {SERVER_IP}")
-    print("📢 Отслеживание входов/выходов активно")
     
     app.run_polling()
 
