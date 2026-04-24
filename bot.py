@@ -5,19 +5,15 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # ========== ВСТАВЬТЕ НОВЫЙ ТОКЕН ==========
-TOKEN = "8590452175:AAGcmk1Gn-GnVZbUUAvLTRhd3QBslVE5bFk"
+TOKEN = "НОВЫЙ_ТОКЕН_ОТ_BOTFATHER"
 # ==========================================
 
 SERVER_IP = "hi3.qwertyx.host:27228"
 
 cache = {"data": None, "time": 0}
-last_players = set()
 chats = set()
-consecutive_empty = 0
-MAX_EMPTY_BEFORE_WARNING = 3
 
 async def get_status():
-    global consecutive_empty
     now = time.time()
     if cache["data"] and now - cache["time"] < 10:
         return cache["data"]
@@ -28,11 +24,6 @@ async def get_status():
         players_list = []
         if status.players.sample:
             players_list = [p.name for p in status.players.sample]
-        
-        if status.players.online > 0 and len(players_list) == 0:
-            consecutive_empty += 1
-        else:
-            consecutive_empty = 0
         
         data = {
             "online": True,
@@ -49,51 +40,6 @@ async def get_status():
     except:
         return {"online": False, "list": [], "names_hidden": False}
 
-async def tracker(app):
-    global last_players, consecutive_empty
-    
-    while True:
-        try:
-            data = await get_status()
-            
-            if data["online"] and not data["names_hidden"]:
-                current = set(data["list"])
-                
-                if len(current) > 0 or len(last_players) == 0:
-                    for player in current - last_players:
-                        if player:
-                            for chat_id in list(chats):
-                                try:
-                                    await app.bot.send_message(chat_id, f"🟢 {player} зашёл на сервер")
-                                except:
-                                    chats.discard(chat_id)
-                            await asyncio.sleep(0.3)
-                    
-                    for player in last_players - current:
-                        if player:
-                            for chat_id in list(chats):
-                                try:
-                                    await app.bot.send_message(chat_id, f"🔴 {player} вышел с сервера")
-                                except:
-                                    chats.discard(chat_id)
-                            await asyncio.sleep(0.3)
-                    
-                    last_players = current
-            
-            elif data["online"] and data["names_hidden"]:
-                if consecutive_empty >= MAX_EMPTY_BEFORE_WARNING and len(chats) > 0:
-                    for chat_id in list(chats):
-                        try:
-                            await app.bot.send_message(chat_id, f"⚠️ На сервере {data['players']} игроков, но хостинг скрывает их имена")
-                        except:
-                            chats.discard(chat_id)
-                    consecutive_empty = 0
-            
-            await asyncio.sleep(5)
-        except Exception as e:
-            print(f"Ошибка: {e}")
-            await asyncio.sleep(5)
-
 def get_main_keyboard():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🟢 Статус", callback_data="status"),
@@ -108,8 +54,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chats.add(chat_id)
     await update.message.reply_text(
         "🎮 **Бот сервера Minecraft**\n\n"
-        "👇 Нажмите на кнопку:\n\n"
-        "📢 Бот уведомляет о входе/выходе игроков",
+        "👇 Нажмите на кнопку:",
         parse_mode="Markdown",
         reply_markup=get_main_keyboard()
     )
@@ -117,7 +62,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_ip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"🖥️ `{SERVER_IP}`", parse_mode="Markdown")
 
-# ========== НОВАЯ КОМАНДА /list ==========
 async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает список всех игроков в сети"""
     data = await get_status()
@@ -134,13 +78,11 @@ async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🌙 На сервере никого нет")
         return
     
-    # Формируем красивый список игроков
     players_list = "\n".join([f"👤 {p}" for p in data["list"]])
     await update.message.reply_text(
         f"👥 **Игроки в сети ({data['players']}/{data['max']}):**\n\n{players_list}",
         parse_mode="Markdown"
     )
-# =========================================
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -218,22 +160,42 @@ async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("🔴 Сервер выключен")
 
+async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Команда /status — статус сервера"""
+    data = await get_status()
+    if not data["online"]:
+        await update.message.reply_text("🔴 Сервер выключен")
+    else:
+        hidden_note = "\n⚠️ Имена игроков скрыты хостингом" if data.get("names_hidden", False) else ""
+        text = (f"🟢 **Сервер работает**\n"
+               f"━━━━━━━━━━━━━━━━━━━\n"
+               f"📊 Онлайн: {data['players']}/{data['max']}\n"
+               f"🎮 Версия: {data['version']}\n"
+               f"📝 {data['motd']}{hidden_note}")
+        await update.message.reply_text(text, parse_mode="Markdown")
+
+async def cmd_online(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Команда /online — только онлайн"""
+    data = await get_status()
+    if data["online"]:
+        await update.message.reply_text(f"📊 **Сейчас на сервере:** {data['players']} / {data['max']} игроков", parse_mode="Markdown")
+    else:
+        await update.message.reply_text("🔴 Сервер выключен")
+
 def main():
     app = Application.builder().token(TOKEN).build()
     
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("ip", cmd_ip))
-    app.add_handler(CommandHandler("list", cmd_list))  # Новая команда
+    app.add_handler(CommandHandler("list", cmd_list))
+    app.add_handler(CommandHandler("status", cmd_status))
+    app.add_handler(CommandHandler("online", cmd_online))
     app.add_handler(CommandHandler("debug", cmd_debug))
     app.add_handler(CallbackQueryHandler(button_handler))
     
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.create_task(tracker(app))
-    
     print("✅ Бот запущен!")
     print(f"📡 Сервер: {SERVER_IP}")
-    print("👥 Команда /list — показать всех игроков в сети")
+    print("📋 Команды: /start, /ip, /list, /status, /online, /debug")
     
     app.run_polling()
 
