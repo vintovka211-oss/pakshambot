@@ -5,10 +5,11 @@ from mcstatus import JavaServer
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, ContextTypes
 
-# === НАСТРОЙКИ (токен и IP возьмите из переменных окружения Railway) ===
-TOKEN = os.getenv("8590452175:AAEkNVYCmmsPLD6JUjyFte1vtXMgHZG4veI")
-SERVER_IP = os.getenv("SERVER_IP", "hi3.qwertyx.host:27228")
-# ===
+# ========== ВСТАВЬТЕ СВОЙ ТОКЕН СЮДА (В КАВЫЧКИ) ==========
+TELEGRAM_TOKEN = "8590452175:AAEkNVYCmmsPLD6JUjyFte1vtXMgHZG4veI"
+# =========================================================
+
+SERVER_IP = "hi3.qwertyx.host:27228"
 
 last_check = 0
 cached_status = None
@@ -69,14 +70,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     active_chats.add(chat_id)
     await update.message.reply_text(
         "🎮 **Бот сервера Minecraft запущен!**\n\n"
-        "/status — статус сервера\n/online — онлайн\n/ping — пинг\n/ip — IP с кнопкой",
+        "/status — статус сервера\n"
+        "/online — онлайн\n"
+        "/ping — пинг\n"
+        "/ip — IP с кнопкой\n\n"
+        "📢 Бот присылает уведомления о входе/выходе",
         parse_mode="Markdown"
     )
 
 async def ip_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("📋 Скопировать IP", copy_text=SERVER_IP)]]
     await update.message.reply_text(
-        f"🖥️ **IP:** `{SERVER_IP}`",
+        f"🖥️ **IP сервера:** `{SERVER_IP}`\n\nНажми кнопку, чтобы скопировать",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
@@ -84,25 +89,41 @@ async def ip_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = await get_server_status()
     if data['online']:
-        msg = f"🟢 **Сервер работает**\n📊 {data['players_online']}/{data['players_max']}\n📡 {data['ping']} мс\n🎮 {data['version']}\n📝 {data['motd']}"
+        ping = data['ping']
+        if ping < 50: ping_emoji = "🟢"
+        elif ping < 100: ping_emoji = "🟡"
+        elif ping < 150: ping_emoji = "🟠"
+        else: ping_emoji = "🔴"
+        
+        msg = (
+            f"🟢 **Сервер работает**\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"📊 Онлайн: {data['players_online']}/{data['players_max']}\n"
+            f"📡 Пинг: {data['ping']} мс {ping_emoji}\n"
+            f"🎮 Версия: {data['version']}\n"
+            f"📝 {data['motd']}"
+        )
     else:
-        msg = "🔴 Сервер выключен"
+        msg = "🔴 **Сервер выключен**"
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 async def online_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = await get_server_status()
-    await update.message.reply_text(f"📊 Онлайн: {data['players_online']}/{data['players_max']}" if data['online'] else "🔴 Сервер выключен")
+    if data['online']:
+        await update.message.reply_text(f"📊 Онлайн: {data['players_online']}/{data['players_max']}")
+    else:
+        await update.message.reply_text("🔴 Сервер выключен")
 
 async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = await get_server_status()
-    await update.message.reply_text(f"📡 Пинг: {data['ping']} мс" if data['online'] else "🔴 Сервер выключен")
+    if data['online']:
+        await update.message.reply_text(f"📡 Пинг: {data['ping']} мс")
+    else:
+        await update.message.reply_text("🔴 Сервер выключен")
 
 def main():
-    if not TOKEN:
-        print("❌ Ошибка: переменная TELEGRAM_TOKEN не установлена")
-        return
+    app = Application.builder().token(TELEGRAM_TOKEN).build()
     
-    app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("ip", ip_command))
     app.add_handler(CommandHandler("status", status_command))
@@ -113,7 +134,9 @@ def main():
     asyncio.set_event_loop(loop)
     loop.create_task(check_players(app))
     
-    print("✅ Бот запущен на Railway")
+    print("✅ Бот запущен")
+    print(f"📡 Сервер: {SERVER_IP}")
+    
     app.run_polling()
 
 if __name__ == "__main__":
