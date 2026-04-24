@@ -13,6 +13,7 @@ SERVER_IP = "hi3.qwertyx.host:27228"
 cache = {"data": None, "time": 0}
 last_players = set()
 chats = set()
+is_tracking = False  # Защита от двойного запуска трекера
 
 async def get_status():
     now = time.time()
@@ -36,27 +37,40 @@ async def get_status():
         return {"online": False, "list": []}
 
 async def tracker(app):
-    global last_players
+    global last_players, is_tracking
+    
+    # Защита от двойного запуска
+    if is_tracking:
+        return
+    is_tracking = True
+    
     while True:
         try:
             data = await get_status()
             if data["online"]:
                 current = set(data["list"])
-                for p in current - last_players:
+                
+                # Новые игроки
+                for p in (current - last_players):
                     for c in list(chats):
                         try:
                             await app.bot.send_message(c, f"🟢 **{p}** зашёл на сервер", parse_mode="Markdown")
                         except:
                             chats.discard(c)
-                for p in last_players - current:
+                
+                # Игроки, которые вышли
+                for p in (last_players - current):
                     for c in list(chats):
                         try:
                             await app.bot.send_message(c, f"🔴 **{p}** вышел с сервера", parse_mode="Markdown")
                         except:
                             chats.discard(c)
+                
                 last_players = current
+            
             await asyncio.sleep(5)
-        except:
+        except Exception as e:
+            print(f"Ошибка в трекере: {e}")
             await asyncio.sleep(5)
 
 def get_main_keyboard():
@@ -68,9 +82,12 @@ def get_main_keyboard():
     ])
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chats.add(update.effective_chat.id)
+    chat_id = update.effective_chat.id
+    chats.add(chat_id)
     await update.message.reply_text(
-        "🎮 **Бот сервера Minecraft**\n\n👇 Нажмите на кнопку:",
+        "🎮 **Бот сервера Minecraft**\n\n"
+        "👇 Нажмите на кнопку:\n\n"
+        "📢 Бот будет уведомлять о входе/выходе игроков",
         parse_mode="Markdown",
         reply_markup=get_main_keyboard()
     )
@@ -131,12 +148,14 @@ def main():
     app.add_handler(CommandHandler("ip", cmd_ip))
     app.add_handler(CallbackQueryHandler(button_handler))
     
+    # Запускаем трекер правильно
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.create_task(tracker(app))
     
     print("✅ Бот запущен!")
     print(f"📡 Сервер: {SERVER_IP}")
+    print("📢 Отслеживание входов/выходов активно")
     
     app.run_polling()
 
