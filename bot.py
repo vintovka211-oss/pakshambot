@@ -4,258 +4,192 @@ from mcstatus import JavaServer
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
-# =============================================
-# 👇 ВСТАВЬТЕ СВОЙ ТОКЕН СЮДА (в кавычки)
+# ========== ВСТАВЬТЕ НОВЫЙ ТОКЕН СЮДА ==========
 TOKEN = "8590452175:AAEkNVYCmmsPLD6JUjyFte1vtXMgHZG4veI"
-# =============================================
+# ==============================================
 
 SERVER_IP = "hi3.qwertyx.host:27228"
 
-# Переменные для кэша
-last_status_time = 0
-cached_status = None
-
-# Список чатов, где активен бот
-active_chats = set()
-
-# Последний список игроков для отслеживания входов/выходов
+cache = {"data": None, "time": 0}
 last_players = set()
+chats = set()
 
-
-async def get_server_status():
-    """Получает статус сервера (с кэшем 10 секунд)"""
-    global last_status_time, cached_status
+async def get_status():
     now = time.time()
-    
-    if cached_status and (now - last_status_time) < 10:
-        return cached_status
-    
+    if cache["data"] and now - cache["time"] < 10:
+        return cache["data"]
     try:
         server = JavaServer.lookup(SERVER_IP)
         status = server.status()
         ping = server.ping()
-        
-        result = {
-            'online': True,
-            'players_online': status.players.online,
-            'players_max': status.players.max,
-            'ping': int(ping),
-            'motd': str(status.description),
-            'version': status.version.name,
-            'players_list': []
+        data = {
+            "online": True,
+            "players": status.players.online,
+            "max": status.players.max,
+            "ping": int(ping),
+            "motd": str(status.description),
+            "version": status.version.name,
+            "list": [p.name for p in status.players.sample] if status.players.sample else []
         }
-        
-        # Получаем список имён игроков (если есть)
-        if status.players.sample:
-            result['players_list'] = [p.name for p in status.players.sample]
-        
-        cached_status = result
-        last_status_time = now
-        return result
-        
-    except Exception:
-        return {'online': False, 'players_list': []}
+        cache["data"] = data
+        cache["time"] = now
+        return data
+    except:
+        return {"online": False, "list": []}
 
-
-async def send_to_all_chats(app, message):
-    """Отправляет сообщение во все чаты, где есть бот"""
-    for chat_id in active_chats.copy():
-        try:
-            await app.bot.send_message(chat_id=chat_id, text=message, parse_mode="Markdown")
-        except Exception:
-            active_chats.discard(chat_id)
-
-
-async def player_tracker(app):
-    """Фоновая задача — отслеживает вход и выход игроков"""
+async def tracker(app):
     global last_players
-    
     while True:
         try:
-            status = await get_server_status()
-            
-            if status['online']:
-                current_players = set(status['players_list'])
-                
-                # Новые игроки
-                for player in current_players - last_players:
-                    await send_to_all_chats(app, f"🟢 **{player}** зашёл на сервер")
-                
-                # Игроки, которые вышли
-                for player in last_players - current_players:
-                    await send_to_all_chats(app, f"🔴 **{player}** вышел с сервера")
-                
-                last_players = current_players
-            
+            data = await get_status()
+            if data["online"]:
+                current = set(data["list"])
+                for p in current - last_players:
+                    for c in chats:
+                        try:
+                            await app.bot.send_message(c, f"🟢 **{p}** зашёл на сервер", parse_mode="Markdown")
+                        except:
+                            pass
+                for p in last_players - current:
+                    for c in chats:
+                        try:
+                            await app.bot.send_message(c, f"🔴 **{p}** вышел с сервера", parse_mode="Markdown")
+                        except:
+                            pass
+                last_players = current
             await asyncio.sleep(5)
-            
-        except Exception:
+        except:
             await asyncio.sleep(5)
 
+# === Главное меню с кнопками ===
+def get_main_keyboard():
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🟢 Статус", callback_data="status"),
+         InlineKeyboardButton("📊 Онлайн", callback_data="online")],
+        [InlineKeyboardButton("📡 Пинг", callback_data="ping"),
+         InlineKeyboardButton("🖥️ IP", callback_data="ip")],
+        [InlineKeyboardButton("🔄 Обновить всё", callback_data="refresh")]
+    ])
+    return keyboard
 
-# ============ КОМАНДЫ БОТА ============
-
-async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/start — запуск бота в чате"""
-    chat_id = update.effective_chat.id
-    active_chats.add(chat_id)
-    
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chats.add(update.effective_chat.id)
     await update.message.reply_text(
-        "🎮 **Бот сервера Minecraft запущен!**\n\n"
-        "📋 **Доступные команды:**\n"
-        "/status — полный статус сервера\n"
-        "/online — сколько игроков онлайн\n"
-        "/ping — пинг до сервера\n"
-        "/ip — IP адрес сервера\n\n"
-        "✅ Бот будет уведомлять о входе и выходе игроков",
-        parse_mode="Markdown"
+        "🎮 **Бот сервера Minecraft**\n\n👇 Нажмите на кнопку:",
+        parse_mode="Markdown",
+        reply_markup=get_main_keyboard()
     )
 
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    data = await get_status()
+    action = query.data
+    
+    if action == "status":
+        if not data["online"]:
+            text = "🔴 Сервер выключен"
+        else:
+            ping = data["ping"]
+            if ping < 50: ping_emoji = "🟢"
+            elif ping < 100: ping_emoji = "🟡"
+            elif ping < 150: ping_emoji = "🟠"
+            else: ping_emoji = "🔴"
+            
+            text = (
+                f"🟢 **Сервер работает**\n"
+                f"━━━━━━━━━━━━━━━━━━━\n"
+                f"📊 Онлайн: {data['players']}/{data['max']}\n"
+                f"📡 Пинг: {data['ping']} мс {ping_emoji}\n"
+                f"🎮 Версия: {data['version']}\n"
+                f"📝 {data['motd']}"
+            )
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=get_main_keyboard())
+    
+    elif action == "online":
+        if data["online"]:
+            text = f"📊 **Сейчас на сервере:** {data['players']} / {data['max']} игроков"
+        else:
+            text = "🔴 Сервер выключен"
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=get_main_keyboard())
+    
+    elif action == "ping":
+        if data["online"]:
+            text = f"📡 **Пинг до сервера:** {data['ping']} мс"
+        else:
+            text = "🔴 Сервер выключен"
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=get_main_keyboard())
+    
+    elif action == "ip":
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📋 Скопировать IP", copy_text=SERVER_IP)],
+            [InlineKeyboardButton("🔙 Назад в меню", callback_data="back_to_menu")]
+        ])
+        await query.edit_message_text(
+            f"🖥️ **IP сервера:**\n\n`{SERVER_IP}`\n\n👇 Нажмите кнопку, чтобы скопировать",
+            parse_mode="Markdown",
+            reply_markup=keyboard
+        )
+    
+    elif action == "refresh":
+        global cache
+        cache["data"] = None
+        await query.edit_message_text("🔄 **Обновление...**", parse_mode="Markdown")
+        new_data = await get_status()
+        if new_data["online"]:
+            ping = new_data["ping"]
+            if ping < 50: ping_emoji = "🟢"
+            elif ping < 100: ping_emoji = "🟡"
+            elif ping < 150: ping_emoji = "🟠"
+            else: ping_emoji = "🔴"
+            text = (
+                f"🟢 **Сервер работает**\n"
+                f"━━━━━━━━━━━━━━━━━━━\n"
+                f"📊 Онлайн: {new_data['players']}/{new_data['max']}\n"
+                f"📡 Пинг: {new_data['ping']} мс {ping_emoji}\n"
+                f"🎮 Версия: {new_data['version']}\n"
+                f"📝 {new_data['motd']}"
+            )
+        else:
+            text = "🔴 Сервер выключен"
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=get_main_keyboard())
+    
+    elif action == "back_to_menu":
+        await query.edit_message_text(
+            "🎮 **Главное меню:**\n\n👇 Выберите действие:",
+            parse_mode="Markdown",
+            reply_markup=get_main_keyboard()
+        )
 
 async def cmd_ip(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/ip — показать IP сервера с возможностью копирования"""
+    """Команда /ip — сразу показывает IP с кнопкой копирования"""
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("📋 Скопировать IP", copy_text=SERVER_IP)],
-        [InlineKeyboardButton("📄 Показать текстом", callback_data="show_ip_text")]
+        [InlineKeyboardButton("🔙 Главное меню", callback_data="back_to_menu")]
     ])
-    
     await update.message.reply_text(
-        "🖥️ **IP адрес сервера:**\n\nВыберите способ:",
+        f"🖥️ **IP сервера:**\n\n`{SERVER_IP}`\n\n👇 Нажмите кнопку, чтобы скопировать",
         parse_mode="Markdown",
         reply_markup=keyboard
     )
 
-
-async def callback_show_ip(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик кнопки — показать IP текстом"""
-    query = update.callback_query
-    await query.answer()
-    
-    await query.edit_message_text(
-        f"🖥️ **IP адрес сервера:**\n\n`{SERVER_IP}`\n\n"
-        f"👉 Нажмите на IP, чтобы выделить и скопировать",
-        parse_mode="Markdown"
-    )
-
-
-async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/status — полная информация о сервере"""
-    await update.message.chat.send_action("typing")
-    data = await get_server_status()
-    
-    if not data['online']:
-        await update.message.reply_text("🔴 **Сервер выключен**", parse_mode="Markdown")
-        return
-    
-    # Оценка пинга
-    ping = data['ping']
-    if ping < 50:
-        ping_status = "🟢 Отлично"
-    elif ping < 100:
-        ping_status = "🟡 Хорошо"
-    elif ping < 150:
-        ping_status = "🟠 Средне"
-    else:
-        ping_status = "🔴 Высокий"
-    
-    message = (
-        f"🟢 **Сервер работает**\n"
-        f"━━━━━━━━━━━━━━━━━━━\n"
-        f"📊 **Онлайн:** {data['players_online']} / {data['players_max']}\n"
-        f"📡 **Пинг:** {data['ping']} мс ({ping_status})\n"
-        f"🎮 **Версия:** {data['version']}\n"
-        f"📝 **MOTD:** {data['motd']}\n"
-        f"━━━━━━━━━━━━━━━━━━━"
-    )
-    
-    await update.message.reply_text(message, parse_mode="Markdown")
-
-
-async def cmd_online(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/online — только количество игроков"""
-    data = await get_server_status()
-    
-    if not data['online']:
-        await update.message.reply_text("🔴 Сервер выключен")
-        return
-    
-    online = data['players_online']
-    max_players = data['players_max']
-    
-    if online == 0:
-        emoji = "🌙"
-        text = "Никого нет"
-    elif online < 5:
-        emoji = "🌱"
-        text = "Немного"
-    elif online < 15:
-        emoji = "📈"
-        text = "Оживлённо"
-    else:
-        emoji = "🔥"
-        text = "Многолюдно"
-    
-    await update.message.reply_text(
-        f"{emoji} **Сейчас на сервере:** {online} / {max_players} игроков\n_{text}_",
-        parse_mode="Markdown"
-    )
-
-
-async def cmd_ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/ping — только пинг"""
-    data = await get_server_status()
-    
-    if not data['online']:
-        await update.message.reply_text("🔴 Сервер выключен, пинг не определить")
-        return
-    
-    ping = data['ping']
-    
-    if ping < 50:
-        emoji = "🟢"
-        text = "отличный"
-    elif ping < 100:
-        emoji = "🟡"
-        text = "хороший"
-    elif ping < 150:
-        emoji = "🟠"
-        text = "средний"
-    else:
-        emoji = "🔴"
-        text = "высокий"
-    
-    await update.message.reply_text(
-        f"{emoji} **Пинг до сервера:** {ping} мс — {text}",
-        parse_mode="Markdown"
-    )
-
-
-# ============ ЗАПУСК ============
-
 def main():
     app = Application.builder().token(TOKEN).build()
     
-    # Регистрируем команды
-    app.add_handler(CommandHandler("start", cmd_start))
-    app.add_handler(CommandHandler("status", cmd_status))
-    app.add_handler(CommandHandler("online", cmd_online))
-    app.add_handler(CommandHandler("ping", cmd_ping))
+    app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("ip", cmd_ip))
+    app.add_handler(CallbackQueryHandler(button_handler))
     
-    # Регистрируем обработчик кнопок
-    app.add_handler(CallbackQueryHandler(callback_show_ip, pattern="show_ip_text"))
-    
-    # Запускаем фоновую задачу отслеживания игроков
+    # Запускаем трекер игроков
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    loop.create_task(player_tracker(app))
+    loop.create_task(tracker(app))
     
     print("✅ Бот запущен!")
-    print(f"📡 Отслеживает сервер: {SERVER_IP}")
-    print("🤖 При добавлении в группу напишите /start")
+    print(f"📡 Сервер: {SERVER_IP}")
     
     app.run_polling()
-
 
 if __name__ == "__main__":
     main()
