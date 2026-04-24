@@ -21,12 +21,10 @@ async def get_status():
     try:
         server = JavaServer.lookup(SERVER_IP)
         status = server.status()
-        ping = server.ping()
         data = {
             "online": True,
             "players": status.players.online,
             "max": status.players.max,
-            "ping": int(ping),
             "motd": str(status.description),
             "version": status.version.name,
             "list": [p.name for p in status.players.sample] if status.players.sample else []
@@ -65,9 +63,8 @@ def get_main_keyboard():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🟢 Статус", callback_data="status"),
          InlineKeyboardButton("📊 Онлайн", callback_data="online")],
-        [InlineKeyboardButton("📡 Пинг", callback_data="ping"),
-         InlineKeyboardButton("🖥️ IP", callback_data="ip")],
-        [InlineKeyboardButton("🔄 Обновить", callback_data="refresh")]
+        [InlineKeyboardButton("🖥️ IP", callback_data="ip"),
+         InlineKeyboardButton("🔄 Обновить", callback_data="refresh")]
     ])
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -78,7 +75,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=get_main_keyboard()
     )
 
-# ⭐ ГЛАВНОЕ — КОМАНДА /ip ВЫВОДИТ ТОЛЬКО IP
 async def cmd_ip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"🖥️ `{SERVER_IP}`", parse_mode="Markdown")
 
@@ -93,15 +89,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not data["online"]:
             text = "🔴 Сервер выключен"
         else:
-            ping = data["ping"]
-            if ping < 50: ping_emoji = "🟢"
-            elif ping < 100: ping_emoji = "🟡"
-            elif ping < 150: ping_emoji = "🟠"
-            else: ping_emoji = "🔴"
             text = (f"🟢 **Сервер работает**\n"
                    f"━━━━━━━━━━━━━━━━━━━\n"
                    f"📊 Онлайн: {data['players']}/{data['max']}\n"
-                   f"📡 Пинг: {data['ping']} мс {ping_emoji}\n"
                    f"🎮 Версия: {data['version']}\n"
                    f"📝 {data['motd']}")
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=get_main_keyboard())
@@ -109,13 +99,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "online":
         if data["online"]:
             text = f"📊 **Сейчас на сервере:** {data['players']} / {data['max']} игроков"
-        else:
-            text = "🔴 Сервер выключен"
-        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=get_main_keyboard())
-    
-    elif action == "ping":
-        if data["online"]:
-            text = f"📡 **Пинг до сервера:** {data['ping']} мс"
         else:
             text = "🔴 Сервер выключен"
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=get_main_keyboard())
@@ -132,15 +115,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("🔄 **Обновление...**", parse_mode="Markdown")
         new_data = await get_status()
         if new_data["online"]:
-            ping = new_data["ping"]
-            if ping < 50: ping_emoji = "🟢"
-            elif ping < 100: ping_emoji = "🟡"
-            elif ping < 150: ping_emoji = "🟠"
-            else: ping_emoji = "🔴"
             text = (f"🟢 **Сервер работает**\n"
                    f"━━━━━━━━━━━━━━━━━━━\n"
                    f"📊 Онлайн: {new_data['players']}/{new_data['max']}\n"
-                   f"📡 Пинг: {new_data['ping']} мс {ping_emoji}\n"
                    f"🎮 Версия: {new_data['version']}\n"
                    f"📝 {new_data['motd']}")
         else:
@@ -151,7 +128,7 @@ def main():
     app = Application.builder().token(TOKEN).build()
     
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("ip", cmd_ip))  # <--- Команда /ip
+    app.add_handler(CommandHandler("ip", cmd_ip))
     app.add_handler(CallbackQueryHandler(button_handler))
     
     loop = asyncio.new_event_loop()
