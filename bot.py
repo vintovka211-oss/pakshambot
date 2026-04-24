@@ -3,11 +3,11 @@ import time
 import asyncio
 from mcstatus import JavaServer
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
-# ========== ВСТАВЬТЕ СВОЙ ТОКЕН СЮДА (В КАВЫЧКИ) ==========
+# ========== ВСТАВЬТЕ СВОЙ ТОКЕН СЮДА ==========
 TELEGRAM_TOKEN = "8590452175:AAEkNVYCmmsPLD6JUjyFte1vtXMgHZG4veI"
-# =========================================================
+# ==============================================
 
 SERVER_IP = "hi3.qwertyx.host:27228"
 
@@ -73,21 +73,34 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/status — статус сервера\n"
         "/online — онлайн\n"
         "/ping — пинг\n"
-        "/ip — IP с кнопкой\n\n"
+        "/ip — IP сервера\n\n"
         "📢 Бот присылает уведомления о входе/выходе",
         parse_mode="Markdown"
     )
 
 async def ip_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[InlineKeyboardButton("📋 Скопировать IP", copy_text=SERVER_IP)]]
+    keyboard = [
+        [InlineKeyboardButton("📋 Копировать (приложение)", copy_text=SERVER_IP)],
+        [InlineKeyboardButton("📄 Показать IP текстом", callback_data="show_ip")]
+    ]
     await update.message.reply_text(
-        f"🖥️ **IP сервера:** `{SERVER_IP}`\n\nНажми кнопку, чтобы скопировать",
+        "🖥️ **IP сервера:**\n\n👇 Выберите способ:",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
+async def show_ip_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text(
+        f"🖥️ **IP сервера:**\n\n`{SERVER_IP}`\n\n*(Нажмите на IP, чтобы выделить и скопировать)*",
+        parse_mode="Markdown"
+    )
+
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.chat.send_action("typing")
     data = await get_server_status()
+    
     if data['online']:
         ping = data['ping']
         if ping < 50: ping_emoji = "🟢"
@@ -105,6 +118,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     else:
         msg = "🔴 **Сервер выключен**"
+    
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 async def online_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -129,6 +143,7 @@ def main():
     app.add_handler(CommandHandler("status", status_command))
     app.add_handler(CommandHandler("online", online_command))
     app.add_handler(CommandHandler("ping", ping_command))
+    app.add_handler(CallbackQueryHandler(show_ip_callback, pattern="show_ip"))
     
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
