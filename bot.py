@@ -4,9 +4,9 @@ from mcstatus import JavaServer
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
-# ========== ВСТАВЬТЕ НОВЫЙ ТОКЕН СЮДА ==========
-TOKEN = "8590452175:AAEkNVYCmmsPLD6JUjyFte1vtXMgHZG4veI"
-# ==============================================
+# ========== ВСТАВЬТЕ НОВЫЙ ТОКЕН ==========
+TOKEN = "8590452175:AAGcmk1Gn-GnVZbUUAvLTRhd3QBslVE5bFk"
+# ==========================================
 
 SERVER_IP = "hi3.qwertyx.host:27228"
 
@@ -45,32 +45,30 @@ async def tracker(app):
             if data["online"]:
                 current = set(data["list"])
                 for p in current - last_players:
-                    for c in chats:
+                    for c in list(chats):
                         try:
                             await app.bot.send_message(c, f"🟢 **{p}** зашёл на сервер", parse_mode="Markdown")
                         except:
-                            pass
+                            chats.discard(c)
                 for p in last_players - current:
-                    for c in chats:
+                    for c in list(chats):
                         try:
                             await app.bot.send_message(c, f"🔴 **{p}** вышел с сервера", parse_mode="Markdown")
                         except:
-                            pass
+                            chats.discard(c)
                 last_players = current
             await asyncio.sleep(5)
         except:
             await asyncio.sleep(5)
 
-# === Главное меню с кнопками ===
 def get_main_keyboard():
-    keyboard = InlineKeyboardMarkup([
+    return InlineKeyboardMarkup([
         [InlineKeyboardButton("🟢 Статус", callback_data="status"),
          InlineKeyboardButton("📊 Онлайн", callback_data="online")],
         [InlineKeyboardButton("📡 Пинг", callback_data="ping"),
          InlineKeyboardButton("🖥️ IP", callback_data="ip")],
-        [InlineKeyboardButton("🔄 Обновить всё", callback_data="refresh")]
+        [InlineKeyboardButton("🔄 Обновить", callback_data="refresh")]
     ])
-    return keyboard
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chats.add(update.effective_chat.id)
@@ -79,6 +77,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown",
         reply_markup=get_main_keyboard()
     )
+
+# ⭐ ГЛАВНОЕ — КОМАНДА /ip ВЫВОДИТ ТОЛЬКО IP
+async def cmd_ip(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(f"🖥️ `{SERVER_IP}`", parse_mode="Markdown")
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -96,15 +98,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             elif ping < 100: ping_emoji = "🟡"
             elif ping < 150: ping_emoji = "🟠"
             else: ping_emoji = "🔴"
-            
-            text = (
-                f"🟢 **Сервер работает**\n"
-                f"━━━━━━━━━━━━━━━━━━━\n"
-                f"📊 Онлайн: {data['players']}/{data['max']}\n"
-                f"📡 Пинг: {data['ping']} мс {ping_emoji}\n"
-                f"🎮 Версия: {data['version']}\n"
-                f"📝 {data['motd']}"
-            )
+            text = (f"🟢 **Сервер работает**\n"
+                   f"━━━━━━━━━━━━━━━━━━━\n"
+                   f"📊 Онлайн: {data['players']}/{data['max']}\n"
+                   f"📡 Пинг: {data['ping']} мс {ping_emoji}\n"
+                   f"🎮 Версия: {data['version']}\n"
+                   f"📝 {data['motd']}")
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=get_main_keyboard())
     
     elif action == "online":
@@ -122,18 +121,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=get_main_keyboard())
     
     elif action == "ip":
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("📋 Скопировать IP", copy_text=SERVER_IP)],
-            [InlineKeyboardButton("🔙 Назад в меню", callback_data="back_to_menu")]
-        ])
         await query.edit_message_text(
-            f"🖥️ **IP сервера:**\n\n`{SERVER_IP}`\n\n👇 Нажмите кнопку, чтобы скопировать",
+            f"🖥️ `{SERVER_IP}`",
             parse_mode="Markdown",
-            reply_markup=keyboard
+            reply_markup=get_main_keyboard()
         )
     
     elif action == "refresh":
-        global cache
         cache["data"] = None
         await query.edit_message_text("🔄 **Обновление...**", parse_mode="Markdown")
         new_data = await get_status()
@@ -143,45 +137,23 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             elif ping < 100: ping_emoji = "🟡"
             elif ping < 150: ping_emoji = "🟠"
             else: ping_emoji = "🔴"
-            text = (
-                f"🟢 **Сервер работает**\n"
-                f"━━━━━━━━━━━━━━━━━━━\n"
-                f"📊 Онлайн: {new_data['players']}/{new_data['max']}\n"
-                f"📡 Пинг: {new_data['ping']} мс {ping_emoji}\n"
-                f"🎮 Версия: {new_data['version']}\n"
-                f"📝 {new_data['motd']}"
-            )
+            text = (f"🟢 **Сервер работает**\n"
+                   f"━━━━━━━━━━━━━━━━━━━\n"
+                   f"📊 Онлайн: {new_data['players']}/{new_data['max']}\n"
+                   f"📡 Пинг: {new_data['ping']} мс {ping_emoji}\n"
+                   f"🎮 Версия: {new_data['version']}\n"
+                   f"📝 {new_data['motd']}")
         else:
             text = "🔴 Сервер выключен"
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=get_main_keyboard())
-    
-    elif action == "back_to_menu":
-        await query.edit_message_text(
-            "🎮 **Главное меню:**\n\n👇 Выберите действие:",
-            parse_mode="Markdown",
-            reply_markup=get_main_keyboard()
-        )
-
-async def cmd_ip(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Команда /ip — сразу показывает IP с кнопкой копирования"""
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📋 Скопировать IP", copy_text=SERVER_IP)],
-        [InlineKeyboardButton("🔙 Главное меню", callback_data="back_to_menu")]
-    ])
-    await update.message.reply_text(
-        f"🖥️ **IP сервера:**\n\n`{SERVER_IP}`\n\n👇 Нажмите кнопку, чтобы скопировать",
-        parse_mode="Markdown",
-        reply_markup=keyboard
-    )
 
 def main():
     app = Application.builder().token(TOKEN).build()
     
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("ip", cmd_ip))
+    app.add_handler(CommandHandler("ip", cmd_ip))  # <--- Команда /ip
     app.add_handler(CallbackQueryHandler(button_handler))
     
-    # Запускаем трекер игроков
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.create_task(tracker(app))
