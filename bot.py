@@ -1,81 +1,47 @@
 import time
 import asyncio
+import aiohttp
 from mcstatus import JavaServer
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
-import socket
-import struct
 
 # ========== НАСТРОЙКИ ==========
-TOKEN = "8590452175:AAGcmk1Gn-GnVZbUUAvLTRhd3QBslVE5bFk"
-SERVER_IP = "hi3.qwertyx.host:27228"
+TOKEN = "8590452175:AAGcmk1Gn-GnVZbUUAvLTRhd3QBslVE5bFk"           # Токен от BotFather
+SERVER_IP = "hi3.qwertyx.host:27228"         # IP сервера
 
-# RCON настройки
-RCON_HOST = "hi3.qwertyx.host"
-RCON_PORT = 25575
-RCON_PASS = "hazesmppassword"
+# Pterodactyl API настройки
+PTERO_API_KEY = "ptlc_j9A9o5AyW4N6MRkF4rs88WMY5DSKFFmAnaC5dxQ0lZF"
+PTERO_SERVER_ID = "c3e8da46"
+PTERO_PANEL_URL = "https://control.qwertyx.host"
 
-# Твой Telegram ID (только ты можешь использовать админ-команды)
-ADMIN_ID = 8493522297
+ADMIN_ID = 8493522297                         # Твой Telegram ID
 # ===============================
 
 cache = {"data": None, "time": 0}
 chats = set()
 
-# Простой RCON клиент
-class SimpleRCON:
-    def __init__(self, host, port, password):
-        self.host = host
-        self.port = port
-        self.password = password
-        self.sock = None
-        self.request_id = 0
+async def send_command(command: str) -> str:
+    """Отправляет команду на сервер через Pterodactyl API"""
+    url = f"{PTERO_PANEL_URL}/api/client/servers/{PTERO_SERVER_ID}/command"
+    headers = {
+        "Authorization": f"Bearer {PTERO_API_KEY}",
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
+    payload = {"command": command}
     
-    def connect(self):
+    async with aiohttp.ClientSession() as session:
         try:
-            self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.sock.settimeout(5)
-            self.sock.connect((self.host, self.port))
-            self._send(3, self.password.encode('utf8'))
-            response = self._receive()
-            return response[0] == 2
-        except:
-            return False
-    
-    def _send(self, cmd_type, data):
-        self.request_id += 1
-        body = struct.pack('<ii', self.request_id, cmd_type) + data + b'\x00\x00'
-        packet = struct.pack('<i', len(body)) + body
-        self.sock.send(packet)
-    
-    def _receive(self):
-        len_data = self.sock.recv(4)
-        if len(len_data) < 4:
-            return None
-        packet_len = struct.unpack('<i', len_data)[0]
-        packet = self.sock.recv(packet_len)
-        request_id, cmd_type = struct.unpack('<ii', packet[:8])
-        data = packet[8:-2].decode('utf8', errors='ignore')
-        return (request_id, cmd_type, data)
-    
-    def command(self, cmd):
-        if not self.connect():
-            return "❌ Ошибка подключения к RCON"
-        self._send(2, cmd.encode('utf8'))
-        resp = self._receive()
-        self.sock.close()
-        return resp[2] if resp else "❌ Нет ответа от сервера"
-
-rcon = SimpleRCON(RCON_HOST, RCON_PORT, RCON_PASS)
-
-def run_rcon(command: str) -> str:
-    try:
-        return rcon.command(command)
-    except Exception as e:
-        return f"Ошибка Rcon: {e}"
+            async with session.post(url, headers=headers, json=payload) as resp:
+                if resp.status == 204:
+                    return "✅ Команда отправлена"
+                else:
+                    text = await resp.text()
+                    return f"❌ Ошибка {resp.status}: {text}"
+        except Exception as e:
+            return f"❌ Ошибка подключения: {e}"
 
 def is_admin(update: Update) -> bool:
-    """Проверяет, является ли отправитель админом"""
     return update.effective_user.id == ADMIN_ID
 
 async def get_status():
@@ -85,12 +51,7 @@ async def get_status():
     try:
         server = JavaServer.lookup(SERVER_IP)
         status = await server.async_status()
-        
-        players_list = []
-        if status.players.sample:
-            for p in status.players.sample:
-                players_list.append(p.name)
-        
+        players_list = [p.name for p in status.players.sample] if status.players.sample else []
         data = {
             "online": True,
             "players": status.players.online,
@@ -107,7 +68,7 @@ async def get_status():
         return {"online": False, "list": [], "names_hidden": False}
 
 def get_main_keyboard():
-    keyboard = InlineKeyboardMarkup([
+    return InlineKeyboardMarkup([
         [InlineKeyboardButton("🟢 Статус", callback_data="status"),
          InlineKeyboardButton("📊 Онлайн", callback_data="online")],
         [InlineKeyboardButton("👥 Список игроков", callback_data="list"),
@@ -115,11 +76,9 @@ def get_main_keyboard():
         [InlineKeyboardButton("📜 Правила", callback_data="rules"),
          InlineKeyboardButton("🔄 Обновить", callback_data="refresh")]
     ])
-    return keyboard
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    chats.add(chat_id)
+    chats.add(update.effective_chat.id)
     await update.message.reply_text(
         "🎮 **HazeSMP**\n\n👇 Нажми на кнопку:",
         reply_markup=get_main_keyboard()
@@ -134,7 +93,7 @@ async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🔴 Сервер выключен")
         return
     if data["names_hidden"]:
-        await update.message.reply_text(f"⚠️ Имена скрыты хостингом\n📊 Онлайн: {data['players']}/{data['max']}")
+        await update.message.reply_text(f"⚠️ Имена скрыты\n📊 Онлайн: {data['players']}/{data['max']}")
         return
     if data["players"] == 0:
         await update.message.reply_text("🌙 На сервере никого нет")
@@ -152,24 +111,16 @@ async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE):
 ✅ **Нарушители получают бан!**
 
 💬 Уважайте других игроков и играйте честно!"""
-    
     await update.message.reply_text(rules_text, parse_mode="Markdown")
 
-# ========== ОТЛАДОЧНАЯ КОМАНДА ==========
 async def cmd_myid(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    user_name = update.effective_user.first_name
-    is_admin = (user_id == ADMIN_ID)
-    
     await update.message.reply_text(
-        f"📌 **Отладка:**\n"
-        f"Твой ID: `{user_id}`\n"
+        f"📌 Твой ID: `{update.effective_user.id}`\n"
         f"ADMIN_ID в коде: `{ADMIN_ID}`\n"
-        f"Совпадение: {'✅ ДА' if is_admin else '❌ НЕТ'}\n"
-        f"Ты можешь использовать админ-команды: {'✅ ДА' if is_admin else '❌ НЕТ'}"
+        f"Совпадение: {'✅ ДА' if update.effective_user.id == ADMIN_ID else '❌ НЕТ'}"
     )
 
-# ========== АДМИН-КОМАНДЫ (только для ADMIN_ID, работают в любом чате) ==========
+# ========== АДМИН-КОМАНДЫ (через API) ==========
 async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
         await update.message.reply_text("⛔ У тебя нет доступа к этой команде.")
@@ -179,8 +130,8 @@ async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     nick = context.args[0]
     reason = " ".join(context.args[1:]) if len(context.args) > 1 else "Нарушение правил"
-    res = run_rcon(f"ban {nick} {reason}")
-    await update.message.reply_text(f"✅ Игрок {nick} забанен.\nПричина: {reason}")
+    result = await send_command(f"ban {nick} {reason}")
+    await update.message.reply_text(f"✅ {result}\nИгрок {nick} забанен.\nПричина: {reason}")
 
 async def cmd_mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
@@ -192,8 +143,8 @@ async def cmd_mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     nick = context.args[0]
     duration = context.args[1]
     reason = " ".join(context.args[2:]) if len(context.args) > 2 else "Нарушение"
-    res = run_rcon(f"mute {nick} {duration} {reason}")
-    await update.message.reply_text(f"🔇 Игрок {nick} замучен на {duration}")
+    result = await send_command(f"mute {nick} {duration} {reason}")
+    await update.message.reply_text(f"🔇 {result}\nИгрок {nick} замучен на {duration}")
 
 async def cmd_unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
@@ -203,8 +154,8 @@ async def cmd_unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Используй: /unmute <ник>")
         return
     nick = context.args[0]
-    res = run_rcon(f"unmute {nick}")
-    await update.message.reply_text(f"✅ Игрок {nick} размучен.")
+    result = await send_command(f"unmute {nick}")
+    await update.message.reply_text(f"✅ {result}\nИгрок {nick} размучен.")
 
 async def cmd_kick(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
@@ -215,8 +166,8 @@ async def cmd_kick(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     nick = context.args[0]
     reason = " ".join(context.args[1:]) if len(context.args) > 1 else "Кик от администратора"
-    res = run_rcon(f"kick {nick} {reason}")
-    await update.message.reply_text(f"👢 Игрок {nick} кикнут.")
+    result = await send_command(f"kick {nick} {reason}")
+    await update.message.reply_text(f"👢 {result}\nИгрок {nick} кикнут.")
 
 async def cmd_say(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
@@ -226,15 +177,15 @@ async def cmd_say(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Используй: /say <сообщение>")
         return
     msg = " ".join(context.args)
-    res = run_rcon(f"say {msg}")
-    await update.message.reply_text(f"📢 Сообщение отправлено в чат сервера.")
+    result = await send_command(f"say {msg}")
+    await update.message.reply_text(f"📢 {result}")
 
 async def cmd_list_rcon(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
         await update.message.reply_text("⛔ У тебя нет доступа к этой команде.")
         return
-    res = run_rcon("list")
-    await update.message.reply_text(f"📡 {res}")
+    result = await send_command("list")
+    await update.message.reply_text(f"📡 {result}\nСписок игроков появится в консоли сервера.")
 
 async def cmd_admin_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
@@ -248,7 +199,7 @@ async def cmd_admin_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /unmute <ник> — снять мут
 /kick <ник> [причина] — кикнуть
 /say <текст> — отправить сообщение в чат сервера
-/list — кто онлайн на сервере (через RCON)
+/list — кто онлайн на сервере (в консоль)
 /adminhelp — это меню
 
 Обычные команды (доступны всем):
@@ -260,15 +211,13 @@ async def cmd_admin_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """
     await update.message.reply_text(help_text)
 
-# ===================================================
-
+# ========== ОБРАБОТЧИК КНОПОК ==========
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    
     data = await get_status()
     action = query.data
-    
+
     if action == "status":
         if not data["online"]:
             text = "🔴 Сервер выключен"
@@ -376,7 +325,8 @@ def main():
     print("✅ Бот запущен!")
     print(f"📡 Сервер: {SERVER_IP}")
     print(f"👑 Админ ID: {ADMIN_ID}")
-    print("🔐 Админ-команды работают в любом чате, но только для твоего ID")
+    print(f"🔗 API панель: {PTERO_PANEL_URL}")
+    print("🔐 Админ-команды работают через Pterodactyl API")
     
     app.run_polling()
 
