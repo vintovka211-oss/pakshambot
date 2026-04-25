@@ -47,7 +47,8 @@ def get_main_keyboard():
          InlineKeyboardButton("📊 Онлайн", callback_data="online")],
         [InlineKeyboardButton("👥 Список игроков", callback_data="list"),
          InlineKeyboardButton("🖥️ IP", callback_data="ip")],
-        [InlineKeyboardButton("🔄 Обновить", callback_data="refresh")]
+        [InlineKeyboardButton("📜 Правила", callback_data="rules"),
+         InlineKeyboardButton("🔄 Обновить", callback_data="refresh")]
     ])
     return keyboard
 
@@ -75,6 +76,19 @@ async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     players_list = "\n".join([f"👤 {p}" for p in data["list"]])
     await update.message.reply_text(f"👥 Игроки ({data['players']}/{data['max']}):\n\n{players_list}")
+
+async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    rules_text = """📜 **Правила сервера HazeSMP**
+
+🚫 **Запрещено:**
+• Строить неприличные постройки (писюны, свастики и т.д.)
+• Оскорблять и задевать родню игроков
+
+✅ **Нарушители получают бан!**
+
+💬 Уважайте других игроков и играйте честно!"""
+    
+    await update.message.reply_text(rules_text, parse_mode="Markdown")
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -117,6 +131,18 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "ip":
         await query.edit_message_text(f"🖥️ {SERVER_IP}", reply_markup=get_main_keyboard())
     
+    elif action == "rules":
+        rules_text = """📜 **Правила сервера HazeSMP**
+
+🚫 **Запрещено:**
+• Строить неприличные постройки (писюны, свастики и т.д.)
+• Оскорблять и задевать родню игроков
+
+✅ **Нарушители получают бан!**
+
+💬 Уважайте других игроков и играйте честно!"""
+        await query.edit_message_text(rules_text, parse_mode="Markdown", reply_markup=get_main_keyboard())
+    
     elif action == "refresh":
         cache["data"] = None
         await query.edit_message_text("🔄 Обновление...", reply_markup=get_main_keyboard())
@@ -158,6 +184,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("ip", cmd_ip))
     app.add_handler(CommandHandler("list", cmd_list))
+    app.add_handler(CommandHandler("rules", cmd_rules))
     app.add_handler(CommandHandler("status", cmd_status))
     app.add_handler(CommandHandler("online", cmd_online))
     app.add_handler(CallbackQueryHandler(button_handler))
