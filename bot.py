@@ -10,7 +10,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Cont
 TOKEN = "8590452175:AAGcmk1Gn-GnVZbUUAvLTRhd3QBslVE5bFk"
 SERVER_IP = "hi3.qwertyx.host:27228"
 
-PTERO_API_KEY = "ptlc_j9A9o5AyW4N6MRkF4rs88WMY5DSKFFmAnaC5dxQ0lZF"
+PTERO_API_KEY = "ptlc_oxthuwStcnrixJQ3F2oT5DHRfEtLSk5BrV8BJZnLV71"
 PTERO_SERVER_ID = "c3e8da46"
 PTERO_PANEL_URL = "https://control.qwertyx.host"
 
