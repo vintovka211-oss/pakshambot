@@ -15,7 +15,7 @@ RCON_HOST = "hi3.qwertyx.host"
 RCON_PORT = 25575
 RCON_PASS = "hazesmppassword"
 
-# Твой Telegram ID
+# Твой Telegram ID (только ты можешь использовать админ-команды)
 ADMIN_ID = 8493522297
 # ===============================
 
@@ -73,6 +73,10 @@ def run_rcon(command: str) -> str:
         return rcon.command(command)
     except Exception as e:
         return f"Ошибка Rcon: {e}"
+
+def is_admin(update: Update) -> bool:
+    """Проверяет, является ли отправитель админом"""
+    return update.effective_user.id == ADMIN_ID
 
 async def get_status():
     now = time.time()
@@ -160,17 +164,15 @@ async def cmd_myid(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"📌 **Отладка:**\n"
         f"Твой ID: `{user_id}`\n"
-        f"Твоё имя: {user_name}\n"
         f"ADMIN_ID в коде: `{ADMIN_ID}`\n"
         f"Совпадение: {'✅ ДА' if is_admin else '❌ НЕТ'}\n"
-        f"Ты админ: {'✅ ДА' if is_admin else '❌ НЕТ'}"
+        f"Ты можешь использовать админ-команды: {'✅ ДА' if is_admin else '❌ НЕТ'}"
     )
 
-# ========== RCON КОМАНДЫ (с проверкой ID) ==========
+# ========== АДМИН-КОМАНДЫ (только для ADMIN_ID, работают в любом чате) ==========
 async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if user_id != ADMIN_ID:
-        await update.message.reply_text(f"⛔ У тебя нет доступа к этой команде.\nТвой ID: {user_id}\nНужен ID: {ADMIN_ID}")
+    if not is_admin(update):
+        await update.message.reply_text("⛔ У тебя нет доступа к этой команде.")
         return
     if len(context.args) < 1:
         await update.message.reply_text("❌ Используй: /ban <ник> [причина]")
@@ -181,7 +183,7 @@ async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ Игрок {nick} забанен.\nПричина: {reason}")
 
 async def cmd_mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
+    if not is_admin(update):
         await update.message.reply_text("⛔ У тебя нет доступа к этой команде.")
         return
     if len(context.args) < 2:
@@ -194,7 +196,7 @@ async def cmd_mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"🔇 Игрок {nick} замучен на {duration}")
 
 async def cmd_unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
+    if not is_admin(update):
         await update.message.reply_text("⛔ У тебя нет доступа к этой команде.")
         return
     if len(context.args) < 1:
@@ -205,7 +207,7 @@ async def cmd_unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ Игрок {nick} размучен.")
 
 async def cmd_kick(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
+    if not is_admin(update):
         await update.message.reply_text("⛔ У тебя нет доступа к этой команде.")
         return
     if len(context.args) < 1:
@@ -217,7 +219,7 @@ async def cmd_kick(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"👢 Игрок {nick} кикнут.")
 
 async def cmd_say(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
+    if not is_admin(update):
         await update.message.reply_text("⛔ У тебя нет доступа к этой команде.")
         return
     if len(context.args) < 1:
@@ -228,14 +230,14 @@ async def cmd_say(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"📢 Сообщение отправлено в чат сервера.")
 
 async def cmd_list_rcon(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
+    if not is_admin(update):
         await update.message.reply_text("⛔ У тебя нет доступа к этой команде.")
         return
     res = run_rcon("list")
     await update.message.reply_text(f"📡 {res}")
 
 async def cmd_admin_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
+    if not is_admin(update):
         await update.message.reply_text("⛔ У тебя нет доступа.")
         return
     help_text = """
@@ -249,12 +251,12 @@ async def cmd_admin_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /list — кто онлайн на сервере (через RCON)
 /adminhelp — это меню
 
-Обычные команды:
+Обычные команды (доступны всем):
 /status — статус сервера
 /online — онлайн
 /ip — IP сервера
 /rules — правила
-/myid — узнать свой ID и проверить доступ
+/myid — узнать свой ID
 """
     await update.message.reply_text(help_text)
 
@@ -351,16 +353,16 @@ async def cmd_online(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     app = Application.builder().token(TOKEN).build()
     
-    # Обычные команды
+    # Обычные команды (доступны всем)
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("ip", cmd_ip))
     app.add_handler(CommandHandler("list", cmd_list))
     app.add_handler(CommandHandler("rules", cmd_rules))
     app.add_handler(CommandHandler("status", cmd_status))
     app.add_handler(CommandHandler("online", cmd_online))
-    app.add_handler(CommandHandler("myid", cmd_myid))  # Отладочная команда
+    app.add_handler(CommandHandler("myid", cmd_myid))
     
-    # Админ-команды (RCON)
+    # Админ-команды (только для ADMIN_ID)
     app.add_handler(CommandHandler("ban", cmd_ban))
     app.add_handler(CommandHandler("mute", cmd_mute))
     app.add_handler(CommandHandler("unmute", cmd_unmute))
@@ -374,6 +376,7 @@ def main():
     print("✅ Бот запущен!")
     print(f"📡 Сервер: {SERVER_IP}")
     print(f"👑 Админ ID: {ADMIN_ID}")
+    print("🔐 Админ-команды работают в любом чате, но только для твоего ID")
     
     app.run_polling()
 
