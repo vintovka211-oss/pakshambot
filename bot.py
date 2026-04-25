@@ -7,22 +7,22 @@ import socket
 import struct
 
 # ========== НАСТРОЙКИ ==========
-TOKEN = "8590452175:AAGcmk1Gn-GnVZbUUAvLTRhd3QBslVE5bFk"  # Вставь новый токен
+TOKEN = "8590452175:AAGcmk1Gn-GnVZbUUAvLTRhd3QBslVE5bFk"
 SERVER_IP = "hi3.qwertyx.host:27228"
 
 # RCON настройки
-RCON_HOST = "hi3.qwertyx.host"  # IP сервера
+RCON_HOST = "hi3.qwertyx.host"
 RCON_PORT = 25575
 RCON_PASS = "hazesmppassword"
 
-# Твой Telegram ID (только ты можешь использовать RCON команды)
+# Твой Telegram ID
 ADMIN_ID = 8493522297
 # ===============================
 
 cache = {"data": None, "time": 0}
 chats = set()
 
-# Простой RCON клиент без внешней библиотеки
+# Простой RCON клиент
 class SimpleRCON:
     def __init__(self, host, port, password):
         self.host = host
@@ -69,7 +69,6 @@ class SimpleRCON:
 rcon = SimpleRCON(RCON_HOST, RCON_PORT, RCON_PASS)
 
 def run_rcon(command: str) -> str:
-    """Выполняет команду на сервере через Rcon"""
     try:
         return rcon.command(command)
     except Exception as e:
@@ -152,10 +151,26 @@ async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(rules_text, parse_mode="Markdown")
 
-# ========== RCON КОМАНДЫ (только для админа) ==========
+# ========== ОТЛАДОЧНАЯ КОМАНДА ==========
+async def cmd_myid(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    user_name = update.effective_user.first_name
+    is_admin = (user_id == ADMIN_ID)
+    
+    await update.message.reply_text(
+        f"📌 **Отладка:**\n"
+        f"Твой ID: `{user_id}`\n"
+        f"Твоё имя: {user_name}\n"
+        f"ADMIN_ID в коде: `{ADMIN_ID}`\n"
+        f"Совпадение: {'✅ ДА' if is_admin else '❌ НЕТ'}\n"
+        f"Ты админ: {'✅ ДА' if is_admin else '❌ НЕТ'}"
+    )
+
+# ========== RCON КОМАНДЫ (с проверкой ID) ==========
 async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        await update.message.reply_text("⛔ У тебя нет доступа к этой команде.")
+    user_id = update.effective_user.id
+    if user_id != ADMIN_ID:
+        await update.message.reply_text(f"⛔ У тебя нет доступа к этой команде.\nТвой ID: {user_id}\nНужен ID: {ADMIN_ID}")
         return
     if len(context.args) < 1:
         await update.message.reply_text("❌ Используй: /ban <ник> [причина]")
@@ -163,7 +178,7 @@ async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     nick = context.args[0]
     reason = " ".join(context.args[1:]) if len(context.args) > 1 else "Нарушение правил"
     res = run_rcon(f"ban {nick} {reason}")
-    await update.message.reply_text(f"✅ Игрок {nick} забанен.\nПричина: {reason}\nОтвет сервера: {res}")
+    await update.message.reply_text(f"✅ Игрок {nick} забанен.\nПричина: {reason}")
 
 async def cmd_mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -176,7 +191,7 @@ async def cmd_mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     duration = context.args[1]
     reason = " ".join(context.args[2:]) if len(context.args) > 2 else "Нарушение"
     res = run_rcon(f"mute {nick} {duration} {reason}")
-    await update.message.reply_text(f"🔇 Игрок {nick} замучен на {duration}\nОтвет сервера: {res}")
+    await update.message.reply_text(f"🔇 Игрок {nick} замучен на {duration}")
 
 async def cmd_unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -187,7 +202,7 @@ async def cmd_unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     nick = context.args[0]
     res = run_rcon(f"unmute {nick}")
-    await update.message.reply_text(f"✅ Игрок {nick} размучен.\nОтвет сервера: {res}")
+    await update.message.reply_text(f"✅ Игрок {nick} размучен.")
 
 async def cmd_kick(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -199,7 +214,7 @@ async def cmd_kick(update: Update, context: ContextTypes.DEFAULT_TYPE):
     nick = context.args[0]
     reason = " ".join(context.args[1:]) if len(context.args) > 1 else "Кик от администратора"
     res = run_rcon(f"kick {nick} {reason}")
-    await update.message.reply_text(f"👢 Игрок {nick} кикнут.\nОтвет сервера: {res}")
+    await update.message.reply_text(f"👢 Игрок {nick} кикнут.")
 
 async def cmd_say(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -210,7 +225,7 @@ async def cmd_say(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     msg = " ".join(context.args)
     res = run_rcon(f"say {msg}")
-    await update.message.reply_text(f"📢 Сообщение отправлено в чат сервера.\nОтвет сервера: {res}")
+    await update.message.reply_text(f"📢 Сообщение отправлено в чат сервера.")
 
 async def cmd_list_rcon(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -239,6 +254,7 @@ async def cmd_admin_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /online — онлайн
 /ip — IP сервера
 /rules — правила
+/myid — узнать свой ID и проверить доступ
 """
     await update.message.reply_text(help_text)
 
@@ -342,6 +358,7 @@ def main():
     app.add_handler(CommandHandler("rules", cmd_rules))
     app.add_handler(CommandHandler("status", cmd_status))
     app.add_handler(CommandHandler("online", cmd_online))
+    app.add_handler(CommandHandler("myid", cmd_myid))  # Отладочная команда
     
     # Админ-команды (RCON)
     app.add_handler(CommandHandler("ban", cmd_ban))
@@ -356,7 +373,7 @@ def main():
     
     print("✅ Бот запущен!")
     print(f"📡 Сервер: {SERVER_IP}")
-    print("🔐 Админ-команды доступны только для твоего ID")
+    print(f"👑 Админ ID: {ADMIN_ID}")
     
     app.run_polling()
 
