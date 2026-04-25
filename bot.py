@@ -47,8 +47,7 @@ def get_main_keyboard():
          InlineKeyboardButton("📊 Онлайн", callback_data="online")],
         [InlineKeyboardButton("👥 Список игроков", callback_data="list"),
          InlineKeyboardButton("🖥️ IP", callback_data="ip")],
-        [InlineKeyboardButton("📜 Правила", callback_data="rules"),
-         InlineKeyboardButton("🔄 Обновить", callback_data="refresh")]
+        [InlineKeyboardButton("🔄 Обновить", callback_data="refresh")]
     ])
     return keyboard
 
@@ -76,38 +75,6 @@ async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     players_list = "\n".join([f"👤 {p}" for p in data["list"]])
     await update.message.reply_text(f"👥 Игроки ({data['players']}/{data['max']}):\n\n{players_list}")
-
-async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    rules_text = """📜 **ПРАВИЛА СЕРВЕРА HazeSMP**
-
-⚠️ **ВАЖНО: ЧИТЫ = БАН НАВСЕГДА**
-Любой вид читов, X-Ray, автокликеры, KillAura, Fly, Speed и т.д.
-→ БАН НАВСЕГДА без права обжалования
-
-🌿 **Этика и чистота карты**
-1. Не разбрасывайте блоки где попало
-2. Не стройте бессмысленные постройки вне базы
-3. Запрещены оскорбительные постройки
-
-⚔️ **Гриф и PvP**
-1. При грифе запрещено уничтожать базу полностью
-2. Запрещён гриф ночью или без владельца базы
-3. Нельзя убивать новичков, если они не напали первыми
-4. Убийство должно быть обосновано
-
-🏰 **Страны и войны**
-1. Глава обязан обозначить границы территории
-2. Запрещено забирать деревни и данжи
-3. О войне предупредить за 12 часов
-4. Мировая война: разрешено всё
-
-🛡️ **Правила для администрации**
-1. Неадекватное поведение → снятие
-2. Запрещено использовать админку в личных целях
-
-💬 Соблюдайте правила и уважайте других!"""
-    
-    await update.message.reply_text(rules_text, parse_mode="Markdown")
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -150,31 +117,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "ip":
         await query.edit_message_text(f"🖥️ {SERVER_IP}", reply_markup=get_main_keyboard())
     
-    elif action == "rules":
-        rules_text = """📜 **ПРАВИЛА СЕРВЕРА HazeSMP**
-
-⚠️ **ЧИТЫ = БАН НАВСЕГДА**
-
-🌿 **Этика**
-1. Не разбрасывайте блоки
-2. Не стройте бессмысленные постройки
-3. Запрещены оскорбительные постройки
-
-⚔️ **Гриф и PvP**
-1. Гриф 50% базы
-2. Нельзя убивать новичков
-3. Убийство должно быть обосновано
-
-🏰 **Страны и войны**
-1. О войне за 12 часов
-2. Мировая война: всё можно
-
-🛡️ **Администрация**
-1. Не использовать админку в личных целях
-
-💬 Уважайте других игроков!"""
-        await query.edit_message_text(rules_text, parse_mode="Markdown", reply_markup=get_main_keyboard())
-    
     elif action == "refresh":
         cache["data"] = None
         await query.edit_message_text("🔄 Обновление...", reply_markup=get_main_keyboard())
@@ -216,7 +158,6 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("ip", cmd_ip))
     app.add_handler(CommandHandler("list", cmd_list))
-    app.add_handler(CommandHandler("rules", cmd_rules))
     app.add_handler(CommandHandler("status", cmd_status))
     app.add_handler(CommandHandler("online", cmd_online))
     app.add_handler(CallbackQueryHandler(button_handler))
