@@ -1,11 +1,10 @@
 import time
-import os
-from mcstatus import MinecraftServer
+from mcstatus import JavaServer
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # ========== НАСТРОЙКИ ==========
-TOKEN = os.getenv("BOT_TOKEN")
+TOKEN = "8590452175:AAHXgI4NGGfBAxzvnnjW0ZM4_MixECdB8FQ"
 JAVA_IP = "hi3.qwertyx.host:27228"
 BEDROCK_IP = "hi3.qwertyx.host:27562"
 ADMIN_ID = 8493522297
@@ -30,7 +29,7 @@ def get_status():
     if cache["data"] and now - cache["time"] < 10:
         return cache["data"]
     try:
-        server = MinecraftServer.lookup(JAVA_IP)
+        server = JavaServer.lookup(JAVA_IP)
         status = server.status()
         players = [p.name for p in status.players.sample] if status.players.sample else []
         data = {
