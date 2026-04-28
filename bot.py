@@ -77,7 +77,7 @@ async def cmd_ip(update, context):
         "📌 Версия: **1.21.11** и выше\n\n"
         "📱 **Bedrock Edition**\n"
         f"`{BEDROCK_IP}`\n"
-        "📌 Версия: **1.21.70 – 1.21.130**\n\n"
+        "📌 Версия: **1.21.130 и выше**\n\n"
         "🌍 Бери любой порт, играй с друзьями!",
         parse_mode="Markdown"
     )
