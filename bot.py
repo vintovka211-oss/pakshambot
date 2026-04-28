@@ -1,10 +1,11 @@
 import time
+import os
 from mcstatus import MinecraftServer
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # ========== НАСТРОЙКИ ==========
-TOKEN = "8590452175:AAHXgI4NGGfBAxzvnnjW0ZM4_MixECdB8FQ"
+TOKEN = os.getenv("BOT_TOKEN")
 JAVA_IP = "hi3.qwertyx.host:27228"
 BEDROCK_IP = "hi3.qwertyx.host:27562"
 ADMIN_ID = 8493522297
