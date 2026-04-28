@@ -1,6 +1,6 @@
 import time
 import asyncio
-from mcstatus import JavaServer
+import aiohttp
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
@@ -29,7 +29,10 @@ async def get_status():
     now = time.time()
     if cache["data"] and now - cache["time"] < 10:
         return cache["data"]
+    
     try:
+        # Способ 1: Прямое подключение mcstatus
+        from mcstatus import JavaServer
         server = JavaServer.lookup(JAVA_IP)
         status = await server.async_status()
         players = [p.name for p in status.players.sample] if status.players.sample else []
@@ -47,7 +50,36 @@ async def get_status():
             cache["uptime_start"] = now
         return data
     except:
-        return {"online": False, "list": []}
+        pass  # Пробуем следующий способ
+    
+    try:
+        # Способ 2: Через API mcsrvstat (работает даже при блокировке)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"https://api.mcsrvstat.us/2/{JAVA_IP}", timeout=5) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    if data.get("online"):
+                        players_list = []
+                        if data.get("players", {}).get("list"):
+                            players_list = data["players"]["list"]
+                        result = {
+                            "online": True,
+                            "players": data.get("players", {}).get("online", 0),
+                            "max": data.get("players", {}).get("max", 0),
+                            "motd": data.get("motd", {}).get("clean", [""])[0] if data.get("motd") else "HazeSMP",
+                            "version": data.get("version", "1.21.11"),
+                            "list": players_list,
+                        }
+                        cache["data"] = result
+                        cache["time"] = now
+                        if cache["uptime_start"] is None:
+                            cache["uptime_start"] = now
+                        return result
+    except:
+        pass
+    
+    # Сервер офлайн
+    return {"online": False, "list": []}
 
 def get_keyboard():
     return InlineKeyboardMarkup([
