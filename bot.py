@@ -1,6 +1,5 @@
 import time
-import asyncio
-import aiohttp
+from mcstatus import MinecraftServer
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
@@ -25,16 +24,13 @@ def format_uptime(seconds):
     else:
         return f"{minutes}м"
 
-async def get_status():
+def get_status():
     now = time.time()
     if cache["data"] and now - cache["time"] < 10:
         return cache["data"]
-    
     try:
-        # Способ 1: Прямое подключение mcstatus
-        from mcstatus import JavaServer
-        server = JavaServer.lookup(JAVA_IP)
-        status = await server.async_status()
+        server = MinecraftServer.lookup(JAVA_IP)
+        status = server.status()
         players = [p.name for p in status.players.sample] if status.players.sample else []
         data = {
             "online": True,
@@ -49,37 +45,9 @@ async def get_status():
         if cache["uptime_start"] is None:
             cache["uptime_start"] = now
         return data
-    except:
-        pass  # Пробуем следующий способ
-    
-    try:
-        # Способ 2: Через API mcsrvstat (работает даже при блокировке)
-        async with aiohttp.ClientSession() as session:
-            async with session.get(f"https://api.mcsrvstat.us/2/{JAVA_IP}", timeout=5) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    if data.get("online"):
-                        players_list = []
-                        if data.get("players", {}).get("list"):
-                            players_list = data["players"]["list"]
-                        result = {
-                            "online": True,
-                            "players": data.get("players", {}).get("online", 0),
-                            "max": data.get("players", {}).get("max", 0),
-                            "motd": data.get("motd", {}).get("clean", [""])[0] if data.get("motd") else "HazeSMP",
-                            "version": data.get("version", "1.21.11"),
-                            "list": players_list,
-                        }
-                        cache["data"] = result
-                        cache["time"] = now
-                        if cache["uptime_start"] is None:
-                            cache["uptime_start"] = now
-                        return result
-    except:
-        pass
-    
-    # Сервер офлайн
-    return {"online": False, "list": []}
+    except Exception as e:
+        print(f"Ошибка: {e}")
+        return {"online": False, "list": []}
 
 def get_keyboard():
     return InlineKeyboardMarkup([
@@ -133,7 +101,7 @@ async def cmd_bedrock_ip(update, context):
     )
 
 async def cmd_list(update, context):
-    data = await get_status()
+    data = get_status()
     if not data["online"]:
         await update.message.reply_text("🔴 Сервер выключен")
     elif data["players"] == 0:
@@ -164,7 +132,7 @@ async def cmd_myid(update, context):
 async def button_handler(update, context):
     query = update.callback_query
     await query.answer()
-    data = await get_status()
+    data = get_status()
 
     if query.data == "status":
         if not data["online"]:
@@ -215,7 +183,7 @@ async def button_handler(update, context):
     elif query.data == "refresh":
         cache["data"] = None
         await query.edit_message_text("🔄 Обновление...", reply_markup=get_keyboard())
-        new_data = await get_status()
+        new_data = get_status()
         if new_data["online"]:
             text = f"🟢 Сервер работает\n📊 Онлайн: {new_data['players']}/{new_data['max']}"
         else:
@@ -223,14 +191,14 @@ async def button_handler(update, context):
         await query.edit_message_text(text, reply_markup=get_keyboard())
 
 async def cmd_status(update, context):
-    data = await get_status()
+    data = get_status()
     if not data["online"]:
         await update.message.reply_text("🔴 Сервер выключен")
     else:
         await update.message.reply_text(f"🟢 **HazeSMP**\n📊 Онлайн: {data['players']}/{data['max']}\n🎮 Версия: {data['version']}\n📝 {data['motd']}", parse_mode="Markdown")
 
 async def cmd_online(update, context):
-    data = await get_status()
+    data = get_status()
     if data["online"]:
         await update.message.reply_text(f"📊 **Онлайн:** {data['players']}/{data['max']}", parse_mode="Markdown")
     else:
