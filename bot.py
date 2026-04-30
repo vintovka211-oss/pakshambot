@@ -13,7 +13,6 @@ ADMIN_ID = 8493522297
 
 cache = {"data": None, "time": 0, "uptime_start": None}
 chats = set()
-last_update = 0
 update_lock = False
 
 def format_uptime(seconds):
@@ -28,7 +27,7 @@ def format_uptime(seconds):
         return f"{minutes}м"
 
 async def get_status():
-    global last_update, update_lock
+    global update_lock
     now = time.time()
     
     if update_lock:
@@ -74,15 +73,16 @@ def get_keyboard():
          InlineKeyboardButton("💻 Java IP", callback_data="java_ip"),
          InlineKeyboardButton("📱 Bedrock IP", callback_data="bedrock_ip")],
         [InlineKeyboardButton("📜 Правила", callback_data="rules"),
-         InlineKeyboardButton("⏱ Uptime", callback_data="uptime"),
-         InlineKeyboardButton("🔄 Обновить", callback_data="refresh")]
+         InlineKeyboardButton("📢 Жалоба", callback_data="report"),
+         InlineKeyboardButton("⏱ Uptime", callback_data="uptime")],
+        [InlineKeyboardButton("🔄 Обновить", callback_data="refresh")]
     ])
 
 async def start(update, context):
-    global chats
     chats.add(update.effective_chat.id)
     await update.message.reply_text(
         "🎮 HazeSMP\n"
+        "🔥 PvP-сервер без приватов\n"
         "👇 Выбери действие:",
         reply_markup=get_keyboard()
     )
@@ -118,6 +118,22 @@ async def cmd_status(update, context):
     else:
         await update.message.reply_text(f"🟢 HazeSMP\n👥 {data['players']}/{data['max']}\n🎮 {data['version']}")
 
+async def cmd_report(update, context):
+    args = context.args
+    if len(args) < 2:
+        await update.message.reply_text("❌ /report <игрок> <причина>\nПример: /report Steve Читер")
+        return
+    
+    player = args[0]
+    reason = ' '.join(args[1:])
+    reporter = update.effective_user.first_name
+    
+    await context.bot.send_message(
+        ADMIN_ID,
+        f"📢 НОВАЯ ЖАЛОБА!\n\n👤 Игрок: {player}\n📝 Причина: {reason}\n📞 Пожаловался: {reporter}\n🆔 ID: {update.effective_user.id}"
+    )
+    await update.message.reply_text(f"✅ Жалоба на {player} отправлена администрации!")
+
 async def button_handler(update, context):
     query = update.callback_query
     await query.answer()
@@ -140,7 +156,7 @@ async def button_handler(update, context):
         elif data["players"] == 0:
             text = "🌙 Никого нет"
         else:
-            java = ', '.join(data["java_list"]) if data["java_list"] else "нет"
+            java = ', '.join(data["java_list"]) if data["java_list'] else "нет"
             bedrock = ', '.join(data["bedrock_list"]) if data["bedrock_list"] else "нет"
             text = f"👥 {data['players']}/{data['max']}\n💻 {java}\n📱 {bedrock}"
         await query.edit_message_text(text, reply_markup=get_keyboard())
@@ -155,6 +171,10 @@ async def button_handler(update, context):
 
     elif query.data == "rules":
         text = "📜 НЕЛЬЗЯ:\n🚫 Неприличные постройки\n🚫 Оскорбления\n✅ ПВП, грифинг, воровство"
+        await query.edit_message_text(text, reply_markup=get_keyboard())
+
+    elif query.data == "report":
+        text = "📢 ЖАЛОБА\n\nКоманда: /report <игрок> <причина>\nПример: /report Steve Читер"
         await query.edit_message_text(text, reply_markup=get_keyboard())
 
     elif query.data == "uptime":
@@ -178,12 +198,14 @@ async def button_handler(update, context):
 
 def main():
     app = Application.builder().token(TOKEN).build()
+
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("ip", cmd_ip))
     app.add_handler(CommandHandler("list", cmd_list))
     app.add_handler(CommandHandler("rules", cmd_rules))
     app.add_handler(CommandHandler("status", cmd_status))
     app.add_handler(CommandHandler("uptime", cmd_uptime))
+    app.add_handler(CommandHandler("report", cmd_report))
     app.add_handler(CallbackQueryHandler(button_handler))
 
     print("✅ Бот HazeSMP запущен!")
