@@ -1,6 +1,5 @@
 import time
 import asyncio
-from datetime import datetime, timedelta
 from mcstatus import JavaServer
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
@@ -70,41 +69,37 @@ def get_keyboard():
 async def start(update, context):
     chats.add(update.effective_chat.id)
     await update.message.reply_text(
-        "🎮 <b>HazeSMP</b>\n"
+        "🎮 HazeSMP\n"
         "🔥 PvP-сервер без приватов\n"
         "👇 Выбери действие:",
-        reply_markup=get_keyboard(),
-        parse_mode="HTML"
+        reply_markup=get_keyboard()
     )
 
 async def cmd_ip(update, context):
     await update.message.reply_text(
-        "💻 <b>Java Edition</b>\n"
-        f"<code>{JAVA_IP}</code>\n"
-        "📌 Версия: <b>1.21.11</b> и выше\n\n"
-        "📱 <b>Bedrock Edition</b>\n"
-        f"<code>{BEDROCK_IP}</code>\n"
-        "📌 Версия: <b>1.21.130</b> и выше\n\n"
-        "🌍 Бери любой порт, играй с друзьями!",
-        parse_mode="HTML"
+        f"💻 Java Edition\n"
+        f"{JAVA_IP}\n"
+        f"📌 Версия: 1.21.11 и выше\n\n"
+        f"📱 Bedrock Edition\n"
+        f"{BEDROCK_IP}\n"
+        f"📌 Версия: 1.21.130 и выше\n\n"
+        f"🌍 Бери любой порт, играй с друзьями!"
     )
 
 async def cmd_java_ip(update, context):
     await update.message.reply_text(
-        "💻 <b>Java Edition</b>\n"
-        f"<code>{JAVA_IP}</code>\n"
-        "✅ Версия: <b>1.21.11</b> и выше\n"
-        "🎮 Заходи на ПК!",
-        parse_mode="HTML"
+        f"💻 Java Edition\n"
+        f"{JAVA_IP}\n"
+        f"✅ Версия: 1.21.11 и выше\n"
+        f"🎮 Заходи на ПК!"
     )
 
 async def cmd_bedrock_ip(update, context):
     await update.message.reply_text(
-        "📱 <b>Bedrock Edition</b>\n"
-        f"<code>{BEDROCK_IP}</code>\n"
-        "✅ Версия: <b>1.21.130</b> и выше\n"
-        "📲 Играй с телефона или планшета!",
-        parse_mode="HTML"
+        f"📱 Bedrock Edition\n"
+        f"{BEDROCK_IP}\n"
+        f"✅ Версия: 1.21.130 и выше\n"
+        f"📲 Играй с телефона или планшета!"
     )
 
 async def cmd_list(update, context):
@@ -117,43 +112,40 @@ async def cmd_list(update, context):
         java = ', '.join(data["java_list"]) if data["java_list"] else "никого"
         bedrock = ', '.join(data["bedrock_list"]) if data["bedrock_list"] else "никого"
         await update.message.reply_text(
-            f"👥 <b>Игроки онлайн:</b> {data['players']}/{data['max']}\n\n"
-            f"💻 <b>Java:</b> {java}\n"
-            f"📱 <b>Bedrock:</b> {bedrock}",
-            parse_mode="HTML"
+            f"👥 Игроки онлайн: {data['players']}/{data['max']}\n\n"
+            f"💻 Java: {java}\n"
+            f"📱 Bedrock: {bedrock}"
         )
 
 async def cmd_rules(update, context):
     await update.message.reply_text(
-        "📜 <b>Правила HazeSMP</b>\n\n"
+        "📜 Правила HazeSMP\n\n"
         "🚫 Не строить неприличные постройки\n"
         "🚫 Не оскорблять и не задевать родню игроков\n"
         "⚔️ Разрешены: ПВП, грифинг, воровство\n\n"
-        "✅ Нарушители получают бан!",
-        parse_mode="HTML"
+        "✅ Нарушители получают бан!"
     )
 
 async def cmd_uptime(update, context):
     if cache["uptime_start"]:
         uptime = time.time() - cache["uptime_start"]
-        await update.message.reply_text(f"⏱ <b>Сервер работает:</b> {format_uptime(uptime)}", parse_mode="HTML")
+        await update.message.reply_text(f"⏱ Сервер работает: {format_uptime(uptime)}")
     else:
         await update.message.reply_text("🔴 Сервер выключен")
 
 async def cmd_news(update, context):
     await update.message.reply_text(
-        "🔔 <b>Новости HazeSMP</b>\n\n"
+        "🔔 Новости HazeSMP\n\n"
         "✅ Добавлен античит Grim\n"
         "✅ Временные баны (/tempban)\n"
         "✅ Команда /spawn\n"
         "✅ Голосовой чат\n"
         "✅ Защита от XRay\n\n"
-        "📢 Следи за обновлениями!",
-        parse_mode="HTML"
+        "📢 Следи за обновлениями!"
     )
 
 async def cmd_myid(update, context):
-    await update.message.reply_text(f"🆔 Твой Telegram ID: <code>{update.effective_user.id}</code>", parse_mode="HTML")
+    await update.message.reply_text(f"🆔 Твой Telegram ID: {update.effective_user.id}")
 
 async def cmd_status(update, context):
     data = await get_status()
@@ -161,17 +153,16 @@ async def cmd_status(update, context):
         await update.message.reply_text("🔴 Сервер выключен")
     else:
         await update.message.reply_text(
-            f"🟢 <b>HazeSMP</b>\n"
+            f"🟢 HazeSMP\n"
             f"📊 Онлайн: {data['players']}/{data['max']}\n"
             f"🎮 Версия: {data['version']}\n"
-            f"📝 {data['motd']}",
-            parse_mode="HTML"
+            f"📝 {data['motd']}"
         )
 
 async def cmd_online(update, context):
     data = await get_status()
     if data["online"]:
-        await update.message.reply_text(f"📊 <b>Онлайн:</b> {data['players']}/{data['max']}", parse_mode="HTML")
+        await update.message.reply_text(f"📊 Онлайн: {data['players']}/{data['max']}")
     else:
         await update.message.reply_text("🔴 Сервер выключен")
 
@@ -185,7 +176,7 @@ async def cmd_broadcast(update, context):
         return
     for chat_id in chats:
         try:
-            await context.bot.send_message(chat_id, f"📢 <b>Анонс HazeSMP</b>\n\n{message}", parse_mode="HTML")
+            await context.bot.send_message(chat_id, f"📢 Анонс HazeSMP\n\n{message}")
         except:
             pass
     await update.message.reply_text("✅ Анонс отправлен!")
@@ -194,9 +185,8 @@ async def cmd_report(update, context):
     args = context.args
     if len(args) < 2:
         await update.message.reply_text(
-            "❌ <b>Использование:</b> /report <игрок> <причина>\n"
-            "📌 Пример: /report Steve Использует читы",
-            parse_mode="HTML"
+            "❌ Использование: /report <игрок> <причина>\n"
+            "📌 Пример: /report Steve Использует читы"
         )
         return
     
@@ -206,14 +196,13 @@ async def cmd_report(update, context):
     
     await context.bot.send_message(
         ADMIN_ID,
-        f"📢 <b>Новая жалоба!</b>\n\n"
-        f"👤 <b>Игрок:</b> {player}\n"
-        f"📝 <b>Причина:</b> {reason}\n"
-        f"📞 <b>Пожаловался:</b> {reporter}\n"
-        f"🆔 <b>ID:</b> {update.effective_user.id}",
-        parse_mode="HTML"
+        f"📢 Новая жалоба!\n\n"
+        f"👤 Игрок: {player}\n"
+        f"📝 Причина: {reason}\n"
+        f"📞 Пожаловался: {reporter}\n"
+        f"🆔 ID: {update.effective_user.id}"
     )
-    await update.message.reply_text(f"✅ Жалоба на <b>{player}</b> отправлена администрации!", parse_mode="HTML")
+    await update.message.reply_text(f"✅ Жалоба на {player} отправлена администрации!")
 
 async def button_handler(update, context):
     query = update.callback_query
@@ -224,15 +213,15 @@ async def button_handler(update, context):
         if not data["online"]:
             text = "🔴 Сервер выключен"
         else:
-            text = (f"🟢 <b>HazeSMP работает</b>\n"
-                    f"📊 Онлайн: <b>{data['players']}/{data['max']}</b>\n"
-                    f"🎮 Версия: <code>{data['version']}</code>\n"
+            text = (f"🟢 HazeSMP работает\n"
+                    f"📊 Онлайн: {data['players']}/{data['max']}\n"
+                    f"🎮 Версия: {data['version']}\n"
                     f"📝 {data['motd']}")
-        await query.edit_message_text(text, reply_markup=get_keyboard(), parse_mode="HTML")
+        await query.edit_message_text(text, reply_markup=get_keyboard())
 
     elif query.data == "online":
-        text = f"📊 <b>Онлайн:</b> {data['players']}/{data['max']}" if data["online"] else "🔴 Сервер выключен"
-        await query.edit_message_text(text, reply_markup=get_keyboard(), parse_mode="HTML")
+        text = f"📊 Онлайн: {data['players']}/{data['max']}" if data["online"] else "🔴 Сервер выключен"
+        await query.edit_message_text(text, reply_markup=get_keyboard())
 
     elif query.data == "list":
         if not data["online"]:
@@ -242,32 +231,31 @@ async def button_handler(update, context):
         else:
             java = ', '.join(data["java_list"]) if data["java_list"] else "никого"
             bedrock = ', '.join(data["bedrock_list"]) if data["bedrock_list"] else "никого"
-            text = (f"👥 <b>Игроки онлайн:</b> {data['players']}/{data['max']}\n\n"
-                    f"💻 <b>Java:</b> {java}\n"
-                    f"📱 <b>Bedrock:</b> {bedrock}")
-        await query.edit_message_text(text, reply_markup=get_keyboard(), parse_mode="HTML")
+            text = (f"👥 Игроки онлайн: {data['players']}/{data['max']}\n\n"
+                    f"💻 Java: {java}\n"
+                    f"📱 Bedrock: {bedrock}")
+        await query.edit_message_text(text, reply_markup=get_keyboard())
 
     elif query.data == "java_ip":
-        text = (f"💻 <b>Java Edition</b>\n"
-                f"<code>{JAVA_IP}</code>\n"
-                "✅ Версия: <b>1.21.11</b> и выше")
-        await query.edit_message_text(text, reply_markup=get_keyboard(), parse_mode="HTML")
+        text = (f"💻 Java Edition\n"
+                f"{JAVA_IP}\n"
+                "✅ Версия: 1.21.11 и выше")
+        await query.edit_message_text(text, reply_markup=get_keyboard())
 
     elif query.data == "bedrock_ip":
-        text = (f"📱 <b>Bedrock Edition</b>\n"
-                f"<code>{BEDROCK_IP}</code>\n"
-                "✅ Версия: <b>1.21.130</b> и выше")
-        await query.edit_message_text(text, reply_markup=get_keyboard(), parse_mode="HTML")
+        text = (f"📱 Bedrock Edition\n"
+                f"{BEDROCK_IP}\n"
+                "✅ Версия: 1.21.130 и выше")
+        await query.edit_message_text(text, reply_markup=get_keyboard())
 
     elif query.data == "rules":
         await query.edit_message_text(
-            "📜 <b>Правила HazeSMP</b>\n\n"
+            "📜 Правила HazeSMP\n\n"
             "🚫 Не строить неприличные постройки\n"
             "🚫 Не оскорблять и не задевать родню\n"
             "⚔️ Разрешены: ПВП, грифинг, воровство\n\n"
             "✅ Нарушители получают бан!",
-            reply_markup=get_keyboard(),
-            parse_mode="HTML"
+            reply_markup=get_keyboard()
         )
 
     elif query.data == "refresh":
@@ -302,7 +290,9 @@ def main():
     print("✅ Бот HazeSMP запущен!")
     print(f"💻 Java: {JAVA_IP}")
     print(f"📱 Bedrock: {BEDROCK_IP}")
-    app.run_polling()
+    
+    # Запуск с обработкой конфликта
+    app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
     main()
