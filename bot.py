@@ -156,7 +156,7 @@ async def button_handler(update, context):
         elif data["players"] == 0:
             text = "🌙 Никого нет"
         else:
-            java = ', '.join(data["java_list"]) if data["java_list'] else "нет"
+            java = ', '.join(data["java_list"]) if data["java_list"] else "нет"
             bedrock = ', '.join(data["bedrock_list"]) if data["bedrock_list"] else "нет"
             text = f"👥 {data['players']}/{data['max']}\n💻 {java}\n📱 {bedrock}"
         await query.edit_message_text(text, reply_markup=get_keyboard())
