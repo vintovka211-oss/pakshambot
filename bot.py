@@ -124,11 +124,7 @@ async def cmd_uptime(update, context):
 async def cmd_news(update, context):
     await update.message.reply_text(
         "🔔 НОВОСТИ HazeSMP\n\n"
-        "✅ Античит Grim\n"
-        "✅ Временные баны (/tempban)\n"
-        "✅ Команда /spawn\n"
-        "✅ Голосовой чат\n"
-        "✅ Защита от XRay"
+        "Нет новостей"
     )
 
 async def cmd_myid(update, context):
