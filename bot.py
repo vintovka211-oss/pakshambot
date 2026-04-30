@@ -13,6 +13,8 @@ ADMIN_ID = 8493522297
 
 cache = {"data": None, "time": 0, "uptime_start": None}
 chats = set()
+last_update = 0
+update_lock = False
 
 def format_uptime(seconds):
     days = seconds // 86400
@@ -26,9 +28,16 @@ def format_uptime(seconds):
         return f"{minutes}м"
 
 async def get_status():
+    global last_update, update_lock
     now = time.time()
-    if cache["data"] and now - cache["time"] < 10:
+    
+    if update_lock:
+        return cache["data"] if cache["data"] else {"online": False}
+    
+    if cache["data"] and now - cache["time"] < 15:
         return cache["data"]
+    
+    update_lock = True
     try:
         server = JavaServer.lookup(JAVA_IP)
         status = await server.async_status()
@@ -49,46 +58,37 @@ async def get_status():
         }
         cache["data"] = data
         cache["time"] = now
-        if cache["uptime_start"] is None:
+        if cache["uptime_start"] is None and data["online"]:
             cache["uptime_start"] = now
+        update_lock = False
         return data
     except:
+        update_lock = False
         return {"online": False, "list": [], "java_list": [], "bedrock_list": []}
 
 def get_keyboard():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🟢 Статус", callback_data="status"),
          InlineKeyboardButton("📊 Онлайн", callback_data="online")],
-        [InlineKeyboardButton("👥 Список игроков", callback_data="list"),
+        [InlineKeyboardButton("👥 Список", callback_data="list"),
          InlineKeyboardButton("💻 Java IP", callback_data="java_ip"),
          InlineKeyboardButton("📱 Bedrock IP", callback_data="bedrock_ip")],
         [InlineKeyboardButton("📜 Правила", callback_data="rules"),
-         InlineKeyboardButton("📢 Жалоба", callback_data="report")],
-        [InlineKeyboardButton("⏱ Uptime", callback_data="uptime"),
-         InlineKeyboardButton("🆔 Мой ID", callback_data="myid"),
+         InlineKeyboardButton("⏱ Uptime", callback_data="uptime"),
          InlineKeyboardButton("🔄 Обновить", callback_data="refresh")]
     ])
 
 async def start(update, context):
+    global chats
     chats.add(update.effective_chat.id)
     await update.message.reply_text(
         "🎮 HazeSMP\n"
-        "🔥 PvP-сервер без приватов\n"
         "👇 Выбери действие:",
         reply_markup=get_keyboard()
     )
 
 async def cmd_ip(update, context):
-    await update.message.reply_text(
-        f"💻 Java: {JAVA_IP}\n📌 1.21.11+\n\n"
-        f"📱 Bedrock: {BEDROCK_IP}\n📌 1.21.130+"
-    )
-
-async def cmd_java_ip(update, context):
-    await update.message.reply_text(f"💻 Java: {JAVA_IP}\n✅ 1.21.11+")
-
-async def cmd_bedrock_ip(update, context):
-    await update.message.reply_text(f"📱 Bedrock: {BEDROCK_IP}\n✅ 1.21.130+")
+    await update.message.reply_text(f"💻 Java: {JAVA_IP} (1.21.11+)\n📱 Bedrock: {BEDROCK_IP} (1.21.130+)")
 
 async def cmd_list(update, context):
     data = await get_status()
@@ -97,21 +97,12 @@ async def cmd_list(update, context):
     elif data["players"] == 0:
         await update.message.reply_text("🌙 Никого нет")
     else:
-        java = ', '.join(data["java_list"]) if data["java_list"] else "никого"
-        bedrock = ', '.join(data["bedrock_list"]) if data["bedrock_list"] else "никого"
-        await update.message.reply_text(
-            f"👥 {data['players']}/{data['max']}\n\n"
-            f"💻 {java}\n"
-            f"📱 {bedrock}"
-        )
+        java = ', '.join(data["java_list"]) if data["java_list"] else "нет"
+        bedrock = ', '.join(data["bedrock_list"]) if data["bedrock_list"] else "нет"
+        await update.message.reply_text(f"👥 {data['players']}/{data['max']}\n💻 {java}\n📱 {bedrock}")
 
 async def cmd_rules(update, context):
-    await update.message.reply_text(
-        "📜 ПРАВИЛА\n\n"
-        "🚫 Не строй неприличные постройки\n"
-        "🚫 Не оскорбляй\n"
-        "⚔️ ПВП, грифинг, воровство разрешены"
-    )
+    await update.message.reply_text("📜 ПРАВИЛА\n🚫 Не строй неприличное\n🚫 Не оскорбляй\n⚔️ ПВП, грифинг, воровство разрешены")
 
 async def cmd_uptime(update, context):
     if cache["uptime_start"]:
@@ -120,57 +111,12 @@ async def cmd_uptime(update, context):
     else:
         await update.message.reply_text("🔴 Сервер выключен")
 
-async def cmd_myid(update, context):
-    await update.message.reply_text(f"🆔 {update.effective_user.id}")
-
 async def cmd_status(update, context):
     data = await get_status()
     if not data["online"]:
         await update.message.reply_text("🔴 Сервер выключен")
     else:
-        await update.message.reply_text(
-            f"🟢 HazeSMP\n"
-            f"👥 {data['players']}/{data['max']}\n"
-            f"🎮 {data['version']}"
-        )
-
-async def cmd_online(update, context):
-    data = await get_status()
-    if data["online"]:
-        await update.message.reply_text(f"👥 {data['players']}/{data['max']}")
-    else:
-        await update.message.reply_text("🔴 Сервер выключен")
-
-async def cmd_broadcast(update, context):
-    if update.effective_user.id != ADMIN_ID:
-        await update.message.reply_text("❌ Нет прав")
-        return
-    message = ' '.join(context.args)
-    if not message:
-        await update.message.reply_text("❌ /broadcast <текст>")
-        return
-    for chat_id in chats:
-        try:
-            await context.bot.send_message(chat_id, f"📢 {message}")
-        except:
-            pass
-    await update.message.reply_text("✅ Отправлено")
-
-async def cmd_report(update, context):
-    args = context.args
-    if len(args) < 2:
-        await update.message.reply_text("❌ /report <игрок> <причина>")
-        return
-    
-    player = args[0]
-    reason = ' '.join(args[1:])
-    reporter = update.effective_user.first_name
-    
-    await context.bot.send_message(
-        ADMIN_ID,
-        f"📢 ЖАЛОБА\nИгрок: {player}\nПричина: {reason}\nОт: {reporter}"
-    )
-    await update.message.reply_text(f"✅ Жалоба на {player} отправлена")
+        await update.message.reply_text(f"🟢 HazeSMP\n👥 {data['players']}/{data['max']}\n🎮 {data['version']}")
 
 async def button_handler(update, context):
     query = update.callback_query
@@ -181,7 +127,7 @@ async def button_handler(update, context):
         if not data["online"]:
             text = "🔴 Сервер выключен"
         else:
-            text = f"🟢 HazeSMP\n👥 {data['players']}/{data['max']}\n🎮 {data['version']}"
+            text = f"🟢 HazeSMP\n👥 {data['players']}/{data['max']}"
         await query.edit_message_text(text, reply_markup=get_keyboard())
 
     elif query.data == "online":
@@ -194,9 +140,9 @@ async def button_handler(update, context):
         elif data["players"] == 0:
             text = "🌙 Никого нет"
         else:
-            java = ', '.join(data["java_list"]) if data["java_list"] else "никого"
-            bedrock = ', '.join(data["bedrock_list"]) if data["bedrock_list"] else "никого"
-            text = f"👥 {data['players']}/{data['max']}\n\n💻 {java}\n📱 {bedrock}"
+            java = ', '.join(data["java_list"]) if data["java_list"] else "нет"
+            bedrock = ', '.join(data["bedrock_list"]) if data["bedrock_list"] else "нет"
+            text = f"👥 {data['players']}/{data['max']}\n💻 {java}\n📱 {bedrock}"
         await query.edit_message_text(text, reply_markup=get_keyboard())
 
     elif query.data == "java_ip":
@@ -211,10 +157,6 @@ async def button_handler(update, context):
         text = "📜 НЕЛЬЗЯ:\n🚫 Неприличные постройки\n🚫 Оскорбления\n✅ ПВП, грифинг, воровство"
         await query.edit_message_text(text, reply_markup=get_keyboard())
 
-    elif query.data == "report":
-        text = "📢 /report <игрок> <причина>"
-        await query.edit_message_text(text, reply_markup=get_keyboard())
-
     elif query.data == "uptime":
         if cache["uptime_start"]:
             uptime = time.time() - cache["uptime_start"]
@@ -223,13 +165,10 @@ async def button_handler(update, context):
             text = "🔴 Сервер выключен"
         await query.edit_message_text(text, reply_markup=get_keyboard())
 
-    elif query.data == "myid":
-        text = f"🆔 {query.from_user.id}"
-        await query.edit_message_text(text, reply_markup=get_keyboard())
-
     elif query.data == "refresh":
         await query.edit_message_text("🔄...", reply_markup=get_keyboard())
         cache["data"] = None
+        cache["time"] = 0
         new_data = await get_status()
         if new_data["online"]:
             text = f"🟢 {new_data['players']}/{new_data['max']}"
@@ -239,20 +178,12 @@ async def button_handler(update, context):
 
 def main():
     app = Application.builder().token(TOKEN).build()
-
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("ip", cmd_ip))
-    app.add_handler(CommandHandler("java_ip", cmd_java_ip))
-    app.add_handler(CommandHandler("bedrock_ip", cmd_bedrock_ip))
     app.add_handler(CommandHandler("list", cmd_list))
     app.add_handler(CommandHandler("rules", cmd_rules))
     app.add_handler(CommandHandler("status", cmd_status))
-    app.add_handler(CommandHandler("online", cmd_online))
     app.add_handler(CommandHandler("uptime", cmd_uptime))
-    app.add_handler(CommandHandler("myid", cmd_myid))
-    app.add_handler(CommandHandler("broadcast", cmd_broadcast))
-    app.add_handler(CommandHandler("report", cmd_report))
-
     app.add_handler(CallbackQueryHandler(button_handler))
 
     print("✅ Бот HazeSMP запущен!")
