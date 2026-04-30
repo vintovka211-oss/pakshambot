@@ -63,6 +63,10 @@ def get_keyboard():
          InlineKeyboardButton("💻 Java IP", callback_data="java_ip"),
          InlineKeyboardButton("📱 Bedrock IP", callback_data="bedrock_ip")],
         [InlineKeyboardButton("📜 Правила", callback_data="rules"),
+         InlineKeyboardButton("📢 Жалоба", callback_data="report"),
+         InlineKeyboardButton("📰 Новости", callback_data="news")],
+        [InlineKeyboardButton("⏱ Uptime", callback_data="uptime"),
+         InlineKeyboardButton("🆔 Мой ID", callback_data="myid"),
          InlineKeyboardButton("🔄 Обновить", callback_data="refresh")]
     ])
 
