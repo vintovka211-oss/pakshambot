@@ -1,3 +1,4 @@
+import os
 import time
 import asyncio
 from mcstatus import JavaServer
@@ -5,10 +6,10 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # ========== НАСТРОЙКИ ==========
-TOKEN = "8590452175:AAHXgI4NGGfBAxzvnnjW0ZM4_MixECdB8FQ"
-JAVA_IP = "hi3.qwertyx.host:27228"
-BEDROCK_IP = "hi3.qwertyx.host:27562"
-ADMIN_ID = 8493522297
+TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")  # ← Токен из переменных окружения
+JAVA_IP = os.environ.get("JAVA_IP", "hi3.qwertyx.host:27228")
+BEDROCK_IP = os.environ.get("BEDROCK_IP", "hi3.qwertyx.host:27562")
+ADMIN_ID = int(os.environ.get("ADMIN_ID", 8493522297))
 # ===============================
 
 cache = {"data": None, "time": 0, "uptime_start": None}
