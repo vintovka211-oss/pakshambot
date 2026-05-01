@@ -1,4 +1,3 @@
-import os
 import time
 import asyncio
 from mcstatus import JavaServer
@@ -6,10 +5,10 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # ========== НАСТРОЙКИ ==========
-TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8590452175:AAHXgI4NGGfBAxzvnnjW0ZM4_MixECdB8FQ")
-JAVA_IP = os.environ.get("JAVA_IP", "hi3.qwertyx.host:27228")
-BEDROCK_IP = os.environ.get("BEDROCK_IP", "hi3.qwertyx.host:27562")
-ADMIN_ID = int(os.environ.get("ADMIN_ID", 8493522297))
+TOKEN = "8590452175:AAHXgI4NGGfBAxzvnnjW0ZM4_MixECdB8FQ"
+JAVA_IP = "hi3.qwertyx.host:27228"
+BEDROCK_IP = "hi3.qwertyx.host:27562"
+ADMIN_ID = 8493522297
 # ===============================
 
 cache = {"data": None, "time": 0, "uptime_start": None}
@@ -94,21 +93,21 @@ async def cmd_ip(update, context):
         await update.message.reply_text("⏳ Подожди 3 секунды!")
         return
     await update.message.reply_text(
-        f"💻 Java Edition\n{JAVA_IP}\n✅ Версия: 1.21.11+\n\n"
-        f"📱 Bedrock Edition\n{BEDROCK_IP}\n✅ Версия: 1.21.130+"
+        f"💻 Java Edition\n{JAVA_IP}\n✅ 1.21.11+\n\n"
+        f"📱 Bedrock Edition\n{BEDROCK_IP}\n✅ 1.21.130+"
     )
 
 async def cmd_java_ip(update, context):
     if not check_rate_limit(update.effective_user.id):
         await update.message.reply_text("⏳ Подожди 3 секунды!")
         return
-    await update.message.reply_text(f"💻 Java IP: {JAVA_IP}\n✅ Версия 1.21.11+")
+    await update.message.reply_text(f"💻 Java IP: {JAVA_IP}\n✅ 1.21.11+")
 
 async def cmd_bedrock_ip(update, context):
     if not check_rate_limit(update.effective_user.id):
         await update.message.reply_text("⏳ Подожди 3 секунды!")
         return
-    await update.message.reply_text(f"📱 Bedrock IP: {BEDROCK_IP}\n✅ Версия 1.21.130+")
+    await update.message.reply_text(f"📱 Bedrock IP: {BEDROCK_IP}\n✅ 1.21.130+")
 
 async def cmd_list(update, context):
     if not check_rate_limit(update.effective_user.id):
@@ -130,9 +129,9 @@ async def cmd_rules(update, context):
         return
     await update.message.reply_text(
         "📜 ПРАВИЛА HazeSMP\n\n"
-        "🚫 Не строить неприличные постройки\n"
-        "🚫 Не оскорблять родню игроков\n"
-        "⚔️ Разрешены: ПВП, грифинг, воровство"
+        "🚫 Не строй неприличные постройки\n"
+        "🚫 Не оскорбляй родню\n"
+        "⚔️ ПВП, грифинг, воровство разрешены"
     )
 
 async def cmd_uptime(update, context):
@@ -182,7 +181,7 @@ async def cmd_report(update, context):
         ADMIN_ID,
         f"📢 НОВАЯ ЖАЛОБА!\n\n👤 Игрок: {player}\n📝 Причина: {reason}\n📞 Пожаловался: {reporter}"
     )
-    await update.message.reply_text(f"✅ Жалоба на {player} отправлена администрации!")
+    await update.message.reply_text(f"✅ Жалоба на {player} отправлена!")
 
 async def button_handler(update, context):
     query = update.callback_query
@@ -218,20 +217,22 @@ async def button_handler(update, context):
         await query.edit_message_text(text, reply_markup=get_keyboard())
 
     elif query.data == "java_ip":
-        text = f"💻 Java Edition\n{JAVA_IP}\n✅ Версия: 1.21.11+"
-        await query.edit_message_text(text, reply_markup=get_keyboard())
+        await query.edit_message_text(f"💻 Java IP: {JAVA_IP}\n✅ 1.21.11+", reply_markup=get_keyboard())
 
     elif query.data == "bedrock_ip":
-        text = f"📱 Bedrock Edition\n{BEDROCK_IP}\n✅ Версия: 1.21.130+"
-        await query.edit_message_text(text, reply_markup=get_keyboard())
+        await query.edit_message_text(f"📱 Bedrock IP: {BEDROCK_IP}\n✅ 1.21.130+", reply_markup=get_keyboard())
 
     elif query.data == "rules":
-        text = "📜 НЕЛЬЗЯ:\n🚫 Неприличные постройки\n🚫 Оскорбления\n✅ ПВП, грифинг, воровство"
-        await query.edit_message_text(text, reply_markup=get_keyboard())
+        await query.edit_message_text(
+            "📜 НЕЛЬЗЯ:\n🚫 Неприличные постройки\n🚫 Оскорбления\n✅ ПВП, грифинг, воровство",
+            reply_markup=get_keyboard()
+        )
 
     elif query.data == "report":
-        text = "📢 ЖАЛОБА\n\nКоманда: /report <игрок> <причина>\nПример: /report Steve Читер"
-        await query.edit_message_text(text, reply_markup=get_keyboard())
+        await query.edit_message_text(
+            "📢 ЖАЛОБА\n\n/report <игрок> <причина>\nПример: /report Steve Читер",
+            reply_markup=get_keyboard()
+        )
 
     elif query.data == "uptime":
         if cache["uptime_start"]:
@@ -274,9 +275,4 @@ def main():
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
-    async def cleanup():
-        app = Application.builder().token(TOKEN).build()
-        await app.bot.delete_webhook(drop_pending_updates=True)
-        await app.bot.close()
-    asyncio.run(cleanup())
     main()
