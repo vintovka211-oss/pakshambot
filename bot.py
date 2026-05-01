@@ -1,3 +1,4 @@
+
 import os
 import time
 import asyncio
@@ -15,7 +16,7 @@ ADMIN_ID = int(os.environ.get("ADMIN_ID", 8493522297))
 cache = {"data": None, "time": 0, "uptime_start": None}
 chats = set()
 last_command_time = {}
-RATE_LIMIT = 3  # секунды между командами от одного пользователя
+RATE_LIMIT = 3
 
 def format_uptime(seconds):
     days = seconds // 86400
@@ -38,7 +39,7 @@ def check_rate_limit(user_id):
 
 async def get_status():
     now = time.time()
-    if cache["data"] and now - cache["time"] < 30:  # 30 секунд кэш
+    if cache["data"] and now - cache["time"] < 30:
         return cache["data"]
     try:
         server = JavaServer.lookup(JAVA_IP)
@@ -68,22 +69,24 @@ async def get_status():
 
 def get_keyboard():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🟢 Статус", callback_data="status")],
-        [InlineKeyboardButton("👥 Список игроков", callback_data="list"),
+        [InlineKeyboardButton("🟢 Статус", callback_data="status"),
+         InlineKeyboardButton("📊 Онлайн", callback_data="online")],
+        [InlineKeyboardButton("👥 Список", callback_data="list"),
+         InlineKeyboardButton("💻 Java IP", callback_data="java_ip"),
          InlineKeyboardButton("📱 Bedrock IP", callback_data="bedrock_ip")],
         [InlineKeyboardButton("📜 Правила", callback_data="rules"),
+         InlineKeyboardButton("📢 Жалоба", callback_data="report"),
          InlineKeyboardButton("⏱ Uptime", callback_data="uptime")],
+        [InlineKeyboardButton("🔄 Обновить", callback_data="refresh")]
     ])
 
 async def start(update, context):
     if not check_rate_limit(update.effective_user.id):
-        await update.message.reply_text("⏳ Подожди 3 секунды перед следующей командой!")
+        await update.message.reply_text("⏳ Подожди 3 секунды!")
         return
     chats.add(update.effective_chat.id)
     await update.message.reply_text(
-        "🎮 HazeSMP\n"
-        "🔥 PvP-сервер без приватов\n"
-        "👇 Выбери действие:",
+        "🎮 HazeSMP\n🔥 PvP-сервер без приватов\n👇 Выбери действие:",
         reply_markup=get_keyboard()
     )
 
@@ -91,7 +94,22 @@ async def cmd_ip(update, context):
     if not check_rate_limit(update.effective_user.id):
         await update.message.reply_text("⏳ Подожди 3 секунды!")
         return
-    await update.message.reply_text(f"💻 Java: {JAVA_IP} (1.21.11+)\n📱 Bedrock: {BEDROCK_IP} (1.21.130+)")
+    await update.message.reply_text(
+        f"💻 Java Edition\n{JAVA_IP}\n✅ Версия: 1.21.11+\n\n"
+        f"📱 Bedrock Edition\n{BEDROCK_IP}\n✅ Версия: 1.21.130+"
+    )
+
+async def cmd_java_ip(update, context):
+    if not check_rate_limit(update.effective_user.id):
+        await update.message.reply_text("⏳ Подожди 3 секунды!")
+        return
+    await update.message.reply_text(f"💻 Java IP: {JAVA_IP}\n✅ Версия 1.21.11+")
+
+async def cmd_bedrock_ip(update, context):
+    if not check_rate_limit(update.effective_user.id):
+        await update.message.reply_text("⏳ Подожди 3 секунды!")
+        return
+    await update.message.reply_text(f"📱 Bedrock IP: {BEDROCK_IP}\n✅ Версия 1.21.130+")
 
 async def cmd_list(update, context):
     if not check_rate_limit(update.effective_user.id):
@@ -111,7 +129,12 @@ async def cmd_rules(update, context):
     if not check_rate_limit(update.effective_user.id):
         await update.message.reply_text("⏳ Подожди 3 секунды!")
         return
-    await update.message.reply_text("📜 ПРАВИЛА\n🚫 Не строй неприличное\n🚫 Не оскорбляй\n⚔️ ПВП, грифинг, воровство разрешены")
+    await update.message.reply_text(
+        "📜 ПРАВИЛА HazeSMP\n\n"
+        "🚫 Не строить неприличные постройки\n"
+        "🚫 Не оскорблять родню игроков\n"
+        "⚔️ Разрешены: ПВП, грифинг, воровство"
+    )
 
 async def cmd_uptime(update, context):
     if not check_rate_limit(update.effective_user.id):
@@ -119,7 +142,7 @@ async def cmd_uptime(update, context):
         return
     if cache["uptime_start"]:
         uptime = time.time() - cache["uptime_start"]
-        await update.message.reply_text(f"⏱ {format_uptime(uptime)}")
+        await update.message.reply_text(f"⏱ Сервер работает: {format_uptime(uptime)}")
     else:
         await update.message.reply_text("🔴 Сервер выключен")
 
@@ -132,6 +155,16 @@ async def cmd_status(update, context):
         await update.message.reply_text("🔴 Сервер выключен")
     else:
         await update.message.reply_text(f"🟢 HazeSMP\n👥 {data['players']}/{data['max']}\n🎮 {data['version']}")
+
+async def cmd_online(update, context):
+    if not check_rate_limit(update.effective_user.id):
+        await update.message.reply_text("⏳ Подожди 3 секунды!")
+        return
+    data = await get_status()
+    if data["online"]:
+        await update.message.reply_text(f"📊 Онлайн: {data['players']}/{data['max']}")
+    else:
+        await update.message.reply_text("🔴 Сервер выключен")
 
 async def cmd_report(update, context):
     if not check_rate_limit(update.effective_user.id):
@@ -150,7 +183,7 @@ async def cmd_report(update, context):
         ADMIN_ID,
         f"📢 НОВАЯ ЖАЛОБА!\n\n👤 Игрок: {player}\n📝 Причина: {reason}\n📞 Пожаловался: {reporter}"
     )
-    await update.message.reply_text(f"✅ Жалоба на {player} отправлена!")
+    await update.message.reply_text(f"✅ Жалоба на {player} отправлена администрации!")
 
 async def button_handler(update, context):
     query = update.callback_query
@@ -170,6 +203,10 @@ async def button_handler(update, context):
             text = f"🟢 HazeSMP\n👥 {data['players']}/{data['max']}"
         await query.edit_message_text(text, reply_markup=get_keyboard())
 
+    elif query.data == "online":
+        text = f"👥 {data['players']}/{data['max']}" if data["online"] else "🔴 Сервер выключен"
+        await query.edit_message_text(text, reply_markup=get_keyboard())
+
     elif query.data == "list":
         if not data["online"]:
             text = "🔴 Сервер выключен"
@@ -181,12 +218,20 @@ async def button_handler(update, context):
             text = f"👥 {data['players']}/{data['max']}\n💻 {java}\n📱 {bedrock}"
         await query.edit_message_text(text, reply_markup=get_keyboard())
 
+    elif query.data == "java_ip":
+        text = f"💻 Java Edition\n{JAVA_IP}\n✅ Версия: 1.21.11+"
+        await query.edit_message_text(text, reply_markup=get_keyboard())
+
     elif query.data == "bedrock_ip":
         text = f"📱 Bedrock Edition\n{BEDROCK_IP}\n✅ Версия: 1.21.130+"
         await query.edit_message_text(text, reply_markup=get_keyboard())
 
     elif query.data == "rules":
         text = "📜 НЕЛЬЗЯ:\n🚫 Неприличные постройки\n🚫 Оскорбления\n✅ ПВП, грифинг, воровство"
+        await query.edit_message_text(text, reply_markup=get_keyboard())
+
+    elif query.data == "report":
+        text = "📢 ЖАЛОБА\n\nКоманда: /report <игрок> <причина>\nПример: /report Steve Читер"
         await query.edit_message_text(text, reply_markup=get_keyboard())
 
     elif query.data == "uptime":
@@ -197,14 +242,28 @@ async def button_handler(update, context):
             text = "🔴 Сервер выключен"
         await query.edit_message_text(text, reply_markup=get_keyboard())
 
+    elif query.data == "refresh":
+        await query.edit_message_text("🔄...", reply_markup=get_keyboard())
+        cache["data"] = None
+        cache["time"] = 0
+        new_data = await get_status()
+        if new_data["online"]:
+            text = f"🟢 {new_data['players']}/{new_data['max']}"
+        else:
+            text = "🔴 Сервер выключен"
+        await query.edit_message_text(text, reply_markup=get_keyboard())
+
 def main():
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("ip", cmd_ip))
+    app.add_handler(CommandHandler("java_ip", cmd_java_ip))
+    app.add_handler(CommandHandler("bedrock_ip", cmd_bedrock_ip))
     app.add_handler(CommandHandler("list", cmd_list))
     app.add_handler(CommandHandler("rules", cmd_rules))
     app.add_handler(CommandHandler("status", cmd_status))
+    app.add_handler(CommandHandler("online", cmd_online))
     app.add_handler(CommandHandler("uptime", cmd_uptime))
     app.add_handler(CommandHandler("report", cmd_report))
     app.add_handler(CallbackQueryHandler(button_handler))
