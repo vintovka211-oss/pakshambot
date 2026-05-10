@@ -1,11 +1,12 @@
 import time
 import asyncio
+import os
 from mcstatus import JavaServer
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # ========== НАСТРОЙКИ ==========
-TOKEN = "8590452175:AAHXgI4NGGfBAxzvnnjW0ZM4_MixECdB8FQ"
+TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 JAVA_IP = "hi3.qwertyx.host:27228"
 BEDROCK_IP = "hi3.qwertyx.host:29098"
 MAP_URL = "http://hi3.qwertyx.host:27100"
