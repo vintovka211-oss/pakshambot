@@ -6,7 +6,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # ========== НАСТРОЙКИ ==========
-TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+TOKEN = "8658864645:AAEevMxzgbB31nSXXP_xB-yEJAU7q714SS5w"
 JAVA_IP = "hi3.qwertyx.host:27228"
 BEDROCK_IP = "hi3.qwertyx.host:29098"
 MAP_URL = "http://hi3.qwertyx.host:27100"
