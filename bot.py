@@ -1,8 +1,9 @@
 import time
 import asyncio
 from mcstatus import JavaServer
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatMemberUpdated
+from telegram.constants import ChatMemberStatus
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ChatMemberHandler, ContextTypes
 
 # ========== НАСТРОЙКИ ==========
 TOKEN = "8590452175:AAF0Ij8fBfK6EZ3XFresIoJDsXZCpN2EAC4"
@@ -56,6 +57,33 @@ def get_keyboard():
         [InlineKeyboardButton("📢 Жалоба", callback_data="report")]
     ])
 
+# ========== ПРИВЕТСТВИЕ НОВОГО УЧАСТНИКА ==========
+async def welcome_new_member(update: ChatMemberUpdated, context: ContextTypes.DEFAULT_TYPE):
+    if update.new_chat_member.status == ChatMemberStatus.MEMBER and update.old_chat_member.status != ChatMemberStatus.MEMBER:
+        user = update.new_chat_member.user
+        
+        try:
+            with open("welcome.png", "rb") as photo:
+                await context.bot.send_photo(
+                    chat_id=update.chat.id,
+                    photo=photo,
+                    caption=f"🎉 **Добро пожаловать, {user.first_name}!**\n\n"
+                            f"🔥 **HazeRage** — PvP-сервер без приватов\n"
+                            f"💻 Java / 📱 Bedrock\n\n"
+                            f"⬇️ **Нажми /start, чтобы начать!**",
+                    parse_mode="Markdown"
+                )
+        except FileNotFoundError:
+            await context.bot.send_message(
+                chat_id=update.chat.id,
+                text=f"🎉 **Добро пожаловать, {user.first_name}!**\n\n"
+                     f"🔥 **HazeRage** — PvP-сервер без приватов\n"
+                     f"💻 Java / 📱 Bedrock\n\n"
+                     f"⬇️ **Нажми /start, чтобы начать!**",
+                parse_mode="Markdown"
+            )
+
+# ========== СТАРТ ==========
 async def start(update, context):
     msg = await update.message.reply_text(
         "🎮 **HazeRage**\n"
@@ -65,6 +93,7 @@ async def start(update, context):
     )
     asyncio.create_task(delete_after(context, msg.chat_id, msg.message_id))
 
+# ========== КНОПКИ ==========
 async def button_handler(update, context):
     query = update.callback_query
     await query.answer()
@@ -73,17 +102,20 @@ async def button_handler(update, context):
     if query.data == "java_ip":
         text = f"💻 **Java Edition**\n`{JAVA_IP}`\n✅ Версия: 1.21.11+"
         await query.edit_message_text(text, parse_mode="Markdown")
-        await query.message.reply_text("⬅️ Вернись в меню", reply_markup=get_keyboard())
+        msg = await query.message.reply_text("⬅️ Вернись в меню", reply_markup=get_keyboard())
+        asyncio.create_task(delete_after(context, msg.chat_id, msg.message_id))
         
     elif query.data == "bedrock_ip":
         text = f"📱 **Bedrock Edition**\n`{BEDROCK_IP}`\n✅ Версия: 1.21.130+"
         await query.edit_message_text(text, parse_mode="Markdown")
-        await query.message.reply_text("⬅️ Вернись в меню", reply_markup=get_keyboard())
+        msg = await query.message.reply_text("⬅️ Вернись в меню", reply_markup=get_keyboard())
+        asyncio.create_task(delete_after(context, msg.chat_id, msg.message_id))
         
     elif query.data == "map":
         text = f"🗺️ **Карта HazeRage**\n\n{MAP_URL}"
         await query.edit_message_text(text, parse_mode="Markdown")
-        await query.message.reply_text("⬅️ Вернись в меню", reply_markup=get_keyboard())
+        msg = await query.message.reply_text("⬅️ Вернись в меню", reply_markup=get_keyboard())
+        asyncio.create_task(delete_after(context, msg.chat_id, msg.message_id))
         
     elif query.data == "list":
         if not data["online"]:
@@ -95,7 +127,8 @@ async def button_handler(update, context):
             bedrock = ', '.join(data["bedrock_list"]) if data["bedrock_list"] else "никого"
             text = f"👥 **Игроки онлайн:** {data['players']}/{data['max']}\n\n💻 Java: {java}\n📱 Bedrock: {bedrock}"
         await query.edit_message_text(text, parse_mode="Markdown")
-        await query.message.reply_text("⬅️ Вернись в меню", reply_markup=get_keyboard())
+        msg = await query.message.reply_text("⬅️ Вернись в меню", reply_markup=get_keyboard())
+        asyncio.create_task(delete_after(context, msg.chat_id, msg.message_id))
         
     elif query.data == "report":
         msg = await query.edit_message_text(
@@ -106,6 +139,7 @@ async def button_handler(update, context):
         )
         asyncio.create_task(delete_after(context, msg.chat_id, msg.message_id, 20))
 
+# ========== ЖАЛОБЫ ==========
 async def cmd_report(update, context):
     args = context.args
     if len(args) < 2:
@@ -130,12 +164,31 @@ async def cmd_report(update, context):
     msg = await update.message.reply_text(f"✅ Жалоба на {player} отправлена!")
     asyncio.create_task(delete_after(context, msg.chat_id, msg.message_id, 10))
 
+# ========== АДМИН КОМАНДЫ ==========
+async def cmd_broadcast(update, context):
+    if update.effective_user.id != ADMIN_ID:
+        await update.message.reply_text("❌ Нет прав")
+        return
+    message = ' '.join(context.args)
+    if not message:
+        await update.message.reply_text("❌ /broadcast <текст>")
+        return
+    for member in await context.bot.get_chat_administrators(update.effective_chat.id):
+        try:
+            await context.bot.send_message(member.user.id, f"📢 {message}")
+        except:
+            pass
+    await update.message.reply_text("✅ Рассылка отправлена")
+
+# ========== MAIN ==========
 def main():
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("report", cmd_report))
+    app.add_handler(CommandHandler("broadcast", cmd_broadcast))
     app.add_handler(CallbackQueryHandler(button_handler))
+    app.add_handler(ChatMemberHandler(welcome_new_member, ChatMemberHandler.CHAT_MEMBER))
 
     print("✅ Бот HazeRage запущен!")
     print(f"💻 Java: {JAVA_IP}")
