@@ -6,7 +6,7 @@ from telegram.constants import ChatMemberStatus
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ChatMemberHandler, ContextTypes
 
 # ========== НАСТРОЙКИ ==========
-TOKEN = "8590452175:AAF0Ij8fBfK6EZ3XFresIoJDsXZCpN2EAC4"
+TOKEN = "8424143166:AAFSM4YHBgR011jyy3qfLiF6WTug9qHKqLE"
 JAVA_IP = "hi3.qwertyx.host:27228"
 BEDROCK_IP = "hi3.qwertyx.host:29098"
 MAP_URL = "http://hi3.qwertyx.host:27100"
