@@ -43,7 +43,8 @@ async def get_status():
         cache["data"] = data
         cache["time"] = now
         return data
-    except:
+    except Exception as e:
+        print(f"Ошибка статуса: {e}")
         return {"online": False, "java_list": [], "bedrock_list": []}
 
 def get_keyboard():
@@ -81,7 +82,7 @@ async def button_handler(update, context):
         asyncio.create_task(delete_after(context, msg.chat_id, msg.message_id))
 
     elif query.data == "map":
-        text = f"🗺️ **Карта**\n{MAP_URL}"
+        text = f"🗺️ **Карта HazeRage**\n{MAP_URL}"
         await query.edit_message_text(text, parse_mode="Markdown")
         msg = await query.message.reply_text("⬅️ Назад", reply_markup=get_keyboard())
         asyncio.create_task(delete_after(context, msg.chat_id, msg.message_id))
