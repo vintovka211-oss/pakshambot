@@ -2,6 +2,7 @@ import os
 import time
 import asyncio
 import socket
+import aiohttp
 from mcstatus import JavaServer
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
@@ -28,32 +29,33 @@ def resolve_host(host):
         return socket.gethostbyname(host)
     except:
         return host
-
 async def get_status():
     now = time.time()
     if cache["data"] and now - cache["time"] < 10:
         return cache["data"]
     try:
-        # Простой сокет-тест: проверяем, открыт ли порт
-        reader, writer = await asyncio.wait_for(
-            asyncio.open_connection(JAVA_HOST, JAVA_PORT),
-            timeout=5
-        )
-        writer.close()
-        await writer.wait_closed()
-        
-        # Если порт открыт — сервер онлайн
-        cache["data"] = {
-            "online": True,
-            "players": "?",
-            "max": "?",
-            "java_list": [],
-            "bedrock_list": [],
-        }
-        cache["time"] = now
-        return cache["data"]
-    except:
-        return {"online": False, "java_list": [], "bedrock_list": []}
+        url = f"https://api.mcsrvstat.us/2/{JAVA_HOST}:{JAVA_PORT}"
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                data = await resp.json()
+                if data.get("online"):
+                    players = data.get("players", {}).get("list", [])
+                    online = data.get("players", {}).get("online", 0)
+                    max_players = data.get("players", {}).get("max", 0)
+                    java_players = [p for p in players if not p.startswith(".")]
+                    bedrock_players = [p for p in players if p.startswith(".")]
+                    cache["data"] = {
+                        "online": True,
+                        "players": online,
+                        "max": max_players,
+                        "java_list": java_players,
+                        "bedrock_list": bedrock_players,
+                    }
+                    cache["time"] = now
+                    return cache["data"]
+    except Exception as e:
+        print(f"Ошибка статуса: {e}")
+    return {"online": False, "java_list": [], "bedrock_list": []}
 
 def get_keyboard():
     return InlineKeyboardMarkup([
