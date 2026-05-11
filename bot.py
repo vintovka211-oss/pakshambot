@@ -5,14 +5,13 @@ from mcstatus import JavaServer
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
-# ===== ТОКЕН ИЗ ПЕРЕМЕННОЙ ОКРУЖЕНИЯ =====
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 ADMIN_ID = int(os.environ.get("ADMIN_ID", 8493522297))
 
-JAVA_IP = "hi3.qwertyx.host:27228"
+JAVA_HOST = "hi3.qwertyx.host"
+JAVA_PORT = 27228
 BEDROCK_IP = "hi3.qwertyx.host:29098"
 MAP_URL = "http://hi3.qwertyx.host:27100"
-# =========================================
 
 cache = {"data": None, "time": 0}
 
@@ -28,7 +27,7 @@ async def get_status():
     if cache["data"] and now - cache["time"] < 10:
         return cache["data"]
     try:
-        server = JavaServer.lookup(JAVA_IP)
+        server = JavaServer.lookup(JAVA_HOST, JAVA_PORT)
         status = await server.async_status()
         players = [p.name for p in status.players.sample] if status.players.sample else []
         java_players = [p for p in players if not p.startswith(".")]
@@ -70,19 +69,19 @@ async def button_handler(update, context):
     data = await get_status()
 
     if query.data == "java_ip":
-        text = f"💻 **Java Edition**\n`{JAVA_IP}`\n✅ 1.21.11+"
+        text = f"💻 **Java**\n`{JAVA_HOST}:{JAVA_PORT}`\n✅ 1.21.11+"
         await query.edit_message_text(text, parse_mode="Markdown")
         msg = await query.message.reply_text("⬅️ Назад", reply_markup=get_keyboard())
         asyncio.create_task(delete_after(context, msg.chat_id, msg.message_id))
 
     elif query.data == "bedrock_ip":
-        text = f"📱 **Bedrock Edition**\n`{BEDROCK_IP}`\n✅ 1.21.130+"
+        text = f"📱 **Bedrock**\n`{BEDROCK_IP}`\n✅ 1.21.130+"
         await query.edit_message_text(text, parse_mode="Markdown")
         msg = await query.message.reply_text("⬅️ Назад", reply_markup=get_keyboard())
         asyncio.create_task(delete_after(context, msg.chat_id, msg.message_id))
 
     elif query.data == "map":
-        text = f"🗺️ **Карта HazeRage**\n{MAP_URL}"
+        text = f"🗺️ **Карта**\n{MAP_URL}"
         await query.edit_message_text(text, parse_mode="Markdown")
         msg = await query.message.reply_text("⬅️ Назад", reply_markup=get_keyboard())
         asyncio.create_task(delete_after(context, msg.chat_id, msg.message_id))
@@ -102,7 +101,7 @@ async def button_handler(update, context):
 
     elif query.data == "report":
         msg = await query.edit_message_text(
-            "📢 **Отправить жалобу**\n\nКоманда: `/report <игрок> <причина>`\nПример: `/report Steve Читер`",
+            "📢 **Жалоба**\n\n`/report <игрок> <причина>`\nПример: `/report Steve`",
             parse_mode="Markdown"
         )
         asyncio.create_task(delete_after(context, msg.chat_id, msg.message_id, 20))
@@ -118,14 +117,14 @@ async def cmd_report(update, context):
     reporter = update.effective_user.first_name
     await context.bot.send_message(
         ADMIN_ID,
-        f"📢 **НОВАЯ ЖАЛОБА**\n\n👤 Игрок: {player}\n📝 Причина: {reason}\n📞 От: {reporter}"
+        f"📢 **ЖАЛОБА**\n👤 {player}\n📝 {reason}\n📞 {reporter}"
     )
     msg = await update.message.reply_text(f"✅ Жалоба на {player} отправлена")
     asyncio.create_task(delete_after(context, msg.chat_id, msg.message_id, 10))
 
 def main():
     if not TOKEN:
-        print("❌ Ошибка: переменная TELEGRAM_TOKEN не найдена!")
+        print("❌ Нет токена! Добавь переменную TELEGRAM_TOKEN")
         return
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
