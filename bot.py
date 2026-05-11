@@ -1,6 +1,7 @@
 import os
 import time
 import asyncio
+import socket
 from mcstatus import JavaServer
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
@@ -10,8 +11,8 @@ ADMIN_ID = int(os.environ.get("ADMIN_ID", 8493522297))
 
 JAVA_HOST = "hi3.qwertyx.host"
 JAVA_PORT = 27228
-BEDROCK_IP = "hi3.qwertyx.host:29098"
-MAP_URL = "http://hi3.qwertyx.host:27100"
+BEDROCK_IP = f"{JAVA_HOST}:29098"
+MAP_URL = f"http://{JAVA_HOST}:27100"
 
 cache = {"data": None, "time": 0}
 
@@ -22,12 +23,20 @@ async def delete_after(context, chat_id, message_id, seconds=30):
     except:
         pass
 
+def resolve_host(host):
+    try:
+        return socket.gethostbyname(host)
+    except:
+        return host
+
 async def get_status():
     now = time.time()
     if cache["data"] and now - cache["time"] < 10:
         return cache["data"]
     try:
-        server = JavaServer.lookup(JAVA_HOST, JAVA_PORT)
+        # Пробуем через mcstatus с прямым IP
+        ip = resolve_host(JAVA_HOST)
+        server = JavaServer.lookup(ip, JAVA_PORT)
         status = await server.async_status()
         players = [p.name for p in status.players.sample] if status.players.sample else []
         java_players = [p for p in players if not p.startswith(".")]
