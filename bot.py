@@ -9,7 +9,6 @@ TOKEN = "8658864645:AAEevMxzgbB31nSXXP_xB-yEJAU7q714SS5w"
 JAVA_IP = "hi3.qwertyx.host:27228"
 BEDROCK_IP = "hi3.qwertyx.host:29098"
 MAP_URL = "http://hi3.qwertyx.host:27100"
-ADMIN_ID = 8493522297
 # ===============================
 
 cache = {"data": None, "time": 0, "uptime_start": None}
@@ -71,28 +70,48 @@ def get_keyboard():
 async def start(update, context):
     chats.add(update.effective_chat.id)
     await update.message.reply_text(
-        "🎮 HazeRage\n"
-        "👇 Выбери действие:",
+        "🎮 HazeRage\n👇 Выбери действие:",
         reply_markup=get_keyboard()
     )
+
+async def cmd_ip(update, context):
+    await update.message.reply_text(f"💻 Java: {JAVA_IP}\n📱 Bedrock: {BEDROCK_IP}")
+
+async def cmd_list(update, context):
+    data = await get_status()
+    if not data["online"]:
+        await update.message.reply_text("🔴 Сервер выключен")
+    elif data["players"] == 0:
+        await update.message.reply_text("🌙 Никого нет")
+    else:
+        java = ', '.join(data["java_list"]) if data["java_list"] else "нет"
+        bedrock = ', '.join(data["bedrock_list"]) if data["bedrock_list"] else "нет"
+        await update.message.reply_text(f"👥 {data['players']}/{data['max']}\n💻 {java}\n📱 {bedrock}")
+
+async def cmd_rules(update, context):
+    await update.message.reply_text("📜 ПРАВИЛА\n🚫 Неприличные постройки\n🚫 Оскорбления\n⚔️ ПВП, грифинг, воровство")
+
+async def cmd_uptime(update, context):
+    if cache["uptime_start"]:
+        uptime = time.time() - cache["uptime_start"]
+        await update.message.reply_text(f"⏱ {format_uptime(uptime)}")
+    else:
+        await update.message.reply_text("🔴 Сервер выключен")
 
 async def button_handler(update, context):
     query = update.callback_query
     await query.answer()
-    
     data = await get_status()
-    
+
     if query.data == "status":
         if not data["online"]:
             text = "🔴 Сервер выключен"
         else:
-            text = f"🟢 HazeRage\n👥 {data['players']}/{data['max']}\n🎮 {data['version']}"
+            text = f"🟢 HazeRage\n👥 {data['players']}/{data['max']}"
         await query.edit_message_text(text, reply_markup=get_keyboard())
-    
     elif query.data == "online":
         text = f"👥 {data['players']}/{data['max']}" if data["online"] else "🔴 Сервер выключен"
         await query.edit_message_text(text, reply_markup=get_keyboard())
-    
     elif query.data == "list":
         if not data["online"]:
             text = "🔴 Сервер выключен"
@@ -101,27 +120,18 @@ async def button_handler(update, context):
         else:
             java = ', '.join(data["java_list"]) if data["java_list"] else "нет"
             bedrock = ', '.join(data["bedrock_list"]) if data["bedrock_list"] else "нет"
-            text = f"👥 {data['players']}/{data['max']}\n💻 Java: {java}\n📱 Bedrock: {bedrock}"
+            text = f"👥 {data['players']}/{data['max']}\n💻 {java}\n📱 {bedrock}"
         await query.edit_message_text(text, reply_markup=get_keyboard())
-    
     elif query.data == "java_ip":
-        text = f"💻 Java\n{JAVA_IP}\n✅ 1.21.11+"
-        await query.edit_message_text(text, reply_markup=get_keyboard())
-    
+        await query.edit_message_text(f"💻 {JAVA_IP}", reply_markup=get_keyboard())
     elif query.data == "bedrock_ip":
-        text = f"📱 Bedrock\n{BEDROCK_IP}\n✅ 1.21.130+"
-        await query.edit_message_text(text, reply_markup=get_keyboard())
-    
+        await query.edit_message_text(f"📱 {BEDROCK_IP}", reply_markup=get_keyboard())
     elif query.data == "map":
-        text = f"🗺️ Карта\n{MAP_URL}"
-        await query.edit_message_text(text, reply_markup=get_keyboard())
-    
+        await query.edit_message_text(f"🗺️ {MAP_URL}", reply_markup=get_keyboard())
     elif query.data == "rules":
-        text = "📜 ПРАВИЛА\n🚫 Неприличные постройки\n🚫 Оскорбления\n⚔️ ПВП, грифинг, воровство"
-        await query.edit_message_text(text, reply_markup=get_keyboard())
-    
+        await query.edit_message_text("📜 ПРАВИЛА\n🚫 Неприличные постройки\n🚫 Оскорбления\n⚔️ ПВП, грифинг, воровство", reply_markup=get_keyboard())
     elif query.data == "refresh":
-        await query.edit_message_text("🔄...", reply_markup=get_keyboard())
+        await query.edit_message_text("🔄 Обновление...", reply_markup=get_keyboard())
         cache["data"] = None
         cache["time"] = 0
         data = await get_status()
@@ -132,8 +142,10 @@ def main():
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("ip", lambda u,c: u.message.reply_text(f"💻 Java: {JAVA_IP}\n📱 Bedrock: {BEDROCK_IP}")))
-    app.add_handler(CommandHandler("list", lambda u,c: None))  # кнопка обрабатывает
+    app.add_handler(CommandHandler("ip", cmd_ip))
+    app.add_handler(CommandHandler("list", cmd_list))
+    app.add_handler(CommandHandler("rules", cmd_rules))
+    app.add_handler(CommandHandler("uptime", cmd_uptime))
     app.add_handler(CallbackQueryHandler(button_handler))
 
     print("✅ Бот HazeRage запущен!")
