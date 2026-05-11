@@ -34,25 +34,25 @@ async def get_status():
     if cache["data"] and now - cache["time"] < 10:
         return cache["data"]
     try:
-        # Пробуем через mcstatus с прямым IP
-        ip = resolve_host(JAVA_HOST)
-        server = JavaServer.lookup(ip, JAVA_PORT)
-        status = await server.async_status()
-        players = [p.name for p in status.players.sample] if status.players.sample else []
-        java_players = [p for p in players if not p.startswith(".")]
-        bedrock_players = [p for p in players if p.startswith(".")]
-        data = {
+        # Простой сокет-тест: проверяем, открыт ли порт
+        reader, writer = await asyncio.wait_for(
+            asyncio.open_connection(JAVA_HOST, JAVA_PORT),
+            timeout=5
+        )
+        writer.close()
+        await writer.wait_closed()
+        
+        # Если порт открыт — сервер онлайн
+        cache["data"] = {
             "online": True,
-            "players": status.players.online,
-            "max": status.players.max,
-            "java_list": java_players,
-            "bedrock_list": bedrock_players,
+            "players": "?",
+            "max": "?",
+            "java_list": [],
+            "bedrock_list": [],
         }
-        cache["data"] = data
         cache["time"] = now
-        return data
-    except Exception as e:
-        print(f"Ошибка статуса: {e}")
+        return cache["data"]
+    except:
         return {"online": False, "java_list": [], "bedrock_list": []}
 
 def get_keyboard():
