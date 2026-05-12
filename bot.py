@@ -36,23 +36,22 @@ async def start(update: Update, context):
     )
 
 async def get_online():
-    """Получает онлайн через API mcsrvstat (без прямого подключения)"""
     try:
-        response = requests.get(f"https://api.mcsrvstat.us/2/{JAVA_IP}", timeout=5)
+        # Быстрый таймаут 3 секунды
+        response = requests.get(f"https://api.mcsrvstat.us/2/{JAVA_IP}", timeout=3)
         data = response.json()
+        
         if data.get("online"):
             players = data.get("players", {})
             online = players.get("online", 0)
             max_players = players.get("max", 0)
-            player_list = players.get("list", [])
-            if player_list:
-                return f"📊 **Онлайн:** {online}/{max_players}\n👥 **Игроки:** {', '.join(player_list)}"
-            else:
-                return f"📊 **Онлайн:** {online}/{max_players}\n🌙 Никого нет"
+            return f"📊 **Онлайн:** {online}/{max_players}"
         else:
             return "🔴 Сервер выключен"
-    except Exception as e:
-        return f"🔴 Ошибка получения онлайна: {e}"
+    except requests.exceptions.Timeout:
+        return "⏱️ Сервер долго отвечает, попробуй позже"
+    except:
+        return "🔴 Ошибка получения онлайна"
 
 async def button_handler(update: Update, context):
     query = update.callback_query
