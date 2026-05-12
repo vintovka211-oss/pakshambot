@@ -57,18 +57,35 @@ async def button_handler(update: Update, context):
     query = update.callback_query
     await query.answer()
     
+    # Получаем чат (группа или личка)
+    chat_id = update.effective_chat.id
+    
     if query.data == "online":
-        await query.edit_message_text("🟢 Проверяю статус сервера...")
-        msg = await get_online()
-        await query.edit_message_text(msg, reply_markup=get_keyboard(), parse_mode="Markdown")
+        await query.edit_message_text("🟢 Проверяю...")
+        
+        now = time.time()
+        if now - online_cache["timestamp"] > 30:
+            try:
+                r = requests.get(f"https://api.mcsrvstat.us/2/{JAVA_IP}", timeout=5)
+                data = r.json()
+                online_cache["online"] = data.get("players", {}).get("online", 0)
+                online_cache["timestamp"] = now
+            except:
+                pass
+        
+        await query.edit_message_text(
+            f"📊 **Онлайн:** {online_cache['online']}\n\n"
+            f"💻 `{JAVA_IP}`\n"
+            f"📱 `{BEDROCK_IP}`\n"
+            f"🗺️ {MAP_URL}",
+            parse_mode="Markdown"
+        )
     
     elif query.data == "report":
         await query.edit_message_text(
             "📢 **Пожаловаться на игрока**\n\n"
-            "Напиши в ответном сообщении:\n"
             "`/report <ник> <причина>`\n\n"
             "Пример: `/report Steve Читер`",
-            reply_markup=get_keyboard(),
             parse_mode="Markdown"
         )
 
