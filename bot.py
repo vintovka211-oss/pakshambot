@@ -1,9 +1,7 @@
 import os
 import sys
-import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
-from mcstatus import JavaServer
 
 # Токен из переменной окружения
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
@@ -41,21 +39,14 @@ async def button_handler(update: Update, context):
     await query.answer()
     
     if query.data == "online":
-        await query.edit_message_text("🟢 Проверяю статус сервера...")
-        try:
-            server = JavaServer.lookup(JAVA_IP)
-            status = await server.async_status()
-            players = status.players.online
-            max_players = status.players.max
-            online_list = [p.name for p in status.players.sample] if status.players.sample else []
-            msg = f"📊 **Онлайн:** {players}/{max_players}\n"
-            if online_list:
-                msg += f"👥 **Игроки:** {', '.join(online_list)}"
-            else:
-                msg += "🌙 Никого нет"
-            await query.edit_message_text(msg, reply_markup=get_keyboard(), parse_mode="Markdown")
-        except Exception as e:
-            await query.edit_message_text(f"🔴 Сервер не отвечает\nОшибка: {e}", reply_markup=get_keyboard())
+        await query.edit_message_text(
+            f"💻 **Java Edition:** `{JAVA_IP}`\n"
+            f"📱 **Bedrock Edition:** `{BEDROCK_IP}`\n"
+            f"🗺️ **Карта:** {MAP_URL}\n\n"
+            f"🟢 Сервер работает, заходи!",
+            reply_markup=get_keyboard(),
+            parse_mode="Markdown"
+        )
     
     elif query.data == "report":
         await query.edit_message_text(
