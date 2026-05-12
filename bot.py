@@ -1,5 +1,6 @@
 import os
 import sys
+import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
@@ -14,7 +15,7 @@ JAVA_IP = "hi3.qwertyx.host:27228"
 BEDROCK_IP = "hi3.qwertyx.host:29098"
 MAP_URL = "http://hi3.qwertyx.host:27100"
 
-# Куда отправлять жалобы
+# Куда отправлять жалобы (ТВОЙ ID)
 ADMIN_ID = 8493522297
 
 def get_keyboard():
@@ -34,19 +35,33 @@ async def start(update: Update, context):
         parse_mode="Markdown"
     )
 
+async def get_online():
+    """Получает онлайн через API mcsrvstat (без прямого подключения)"""
+    try:
+        response = requests.get(f"https://api.mcsrvstat.us/2/{JAVA_IP}", timeout=5)
+        data = response.json()
+        if data.get("online"):
+            players = data.get("players", {})
+            online = players.get("online", 0)
+            max_players = players.get("max", 0)
+            player_list = players.get("list", [])
+            if player_list:
+                return f"📊 **Онлайн:** {online}/{max_players}\n👥 **Игроки:** {', '.join(player_list)}"
+            else:
+                return f"📊 **Онлайн:** {online}/{max_players}\n🌙 Никого нет"
+        else:
+            return "🔴 Сервер выключен"
+    except Exception as e:
+        return f"🔴 Ошибка получения онлайна: {e}"
+
 async def button_handler(update: Update, context):
     query = update.callback_query
     await query.answer()
     
     if query.data == "online":
-        await query.edit_message_text(
-            f"💻 **Java Edition:** `{JAVA_IP}`\n"
-            f"📱 **Bedrock Edition:** `{BEDROCK_IP}`\n"
-            f"🗺️ **Карта:** {MAP_URL}\n\n"
-            f"🟢 Сервер работает, заходи!",
-            reply_markup=get_keyboard(),
-            parse_mode="Markdown"
-        )
+        await query.edit_message_text("🟢 Проверяю статус сервера...")
+        msg = await get_online()
+        await query.edit_message_text(msg, reply_markup=get_keyboard(), parse_mode="Markdown")
     
     elif query.data == "report":
         await query.edit_message_text(
@@ -67,14 +82,19 @@ async def cmd_report(update: Update, context):
     reason = ' '.join(args[1:])
     await context.bot.send_message(
         ADMIN_ID,
-        f"📢 **Жалоба на {player}**\n📝 Причина: {reason}\n👤 От: {update.effective_user.first_name}"
+        f"📢 **Жалоба на {player}**\n📝 Причина: {reason}\n👤 От: {update.effective_user.first_name} (@{update.effective_user.username})"
     )
     await update.message.reply_text(f"✅ Жалоба на **{player}** отправлена администрации!", parse_mode="Markdown")
+
+async def cmd_online(update: Update, context):
+    msg = await get_online()
+    await update.message.reply_text(msg, parse_mode="Markdown")
 
 def main():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("report", cmd_report))
+    app.add_handler(CommandHandler("online", cmd_online))
     app.add_handler(CallbackQueryHandler(button_handler))
     
     print("✅ Бот HazeRage запущен!")
